@@ -1,0 +1,39 @@
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "${default}",
+                "limitSymbolsToIncludedHeaders": false
+            },
+            "includePath": [
+                "/home/nimrod/ros2_ws/install/stair_modeling_ros/include/**",
+                "/home/nimrod/ros2_ws/install/zion_msgs/include/**",
+                "/home/nimrod/ros2_ws/install/zed_components/include/**",
+                "/home/nimrod/ros2_ws/install/zed_interfaces/include/**",
+                "/home/nimrod/ros2_ws/install/image_transport/include/**",
+                "/home/nimrod/ros2_ws/install/camera_info_manager/include/**",
+                "/home/nimrod/ros2_ws/install/camera_calibration_parsers/include/**",
+                "/opt/ros/foxy/include/**",
+                "/home/nimrod/ros2_ws/src/image_common/camera_calibration_parsers/include/**",
+                "/home/nimrod/ros2_ws/src/image_common/camera_info_manager/include/**",
+                "/home/nimrod/ros2_ws/src/image_common/image_transport/include/**",
+                "/home/nimrod/ros2_ws/src/stair_detection_pkg/stair_modeling_ros/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_msgs/include/**",
+                "/usr/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_components/src/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_components/src/cloud_processor/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_components/src/stair_modeling/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_components/src/utilities/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_components/src/broadcaster/include/**",
+                "/home/nimrod/ros2_ws/src/zion_ros2_interface/zion_components/src/**",
+                "${workspaceFolder}/stair_modeling_ros/include/**"
+            ],
+            "name": "ROS",
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "c++14"
+        }
+    ],
+    "version": 4
+}
