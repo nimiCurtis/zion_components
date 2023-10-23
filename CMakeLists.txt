@@ -86,6 +86,8 @@ add_definitions(${PCL_DEFINITIONS})
 ###############################################################################
 # SOURCES
 
+### need to check carefully about unrelevant sources
+
 set(CLOUD_PROCESSOR_INC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/include/visibility_control.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/include/utilities.h
@@ -118,8 +120,6 @@ set(STAIR_MODELING_INC
 
 set(STAIR_MODELING_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/src/utilities.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/src/cloud_processor_component.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/src/zion_broadcaster_component.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/src/plane.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/src/stair.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/src/stair_modeling_component.cpp
@@ -175,11 +175,6 @@ install(TARGETS
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
-# install(TARGETS
-#   stair_modeling_ros
-#   RUNTIME DESTINATION lib/${PROJECT_NAME}
-# )
-
 # Mark cpp header files for installation
 install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/src/include/
@@ -188,14 +183,14 @@ install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include/
   ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/include/
   DESTINATION include/${PROJECT_NAME}/
-  # FILES_MATCHING PATTERN "*.hpp"
 )
 
 ament_export_include_directories(include)
-ament_export_libraries(#zion_components
+ament_export_libraries(
                       cloud_processor_component
                       zion_broadcaster_component
-                      stair_modeling_component)
+                      stair_modeling_component
+                      )
 ament_export_dependencies(${DEPENDENCIES})
 
 if(BUILD_TESTING)
