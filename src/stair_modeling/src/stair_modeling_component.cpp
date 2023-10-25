@@ -1,8 +1,8 @@
 
 #include "stair_modeling_component.hpp"
-
-#include <zion_msgs/msg/env_geo_stamped.h>
-#include <zion_msgs/msg/env_geo.h>
+// #include <zion_msgs/msg/
+#include <zion_msgs/msg/stair.hpp>
+#include <zion_msgs/msg/stair_stamped.hpp>
 
 #include <chrono>
 #include <functional>
@@ -33,6 +33,7 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/surface/mls.h>
 
+
 namespace zion
 {
     StairModeling::StairModeling(const rclcpp::NodeOptions &options)
@@ -54,9 +55,11 @@ namespace zion
         qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(filtered_point_cloud_topic_, qos_profile_pcl,
             std::bind(&StairModeling::pclCallback, this, std::placeholders::_1));
-
+        
+        
         hull_marker_array_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/stair_modeling_ros/hull_marker_array",10);
-        env_geo_pub_ = this->create_publisher<zion_msgs::msg::EnvGeoStamped>("/stair_modeling_ros/env_geo_params",10);
+        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("/stair_modeling_ros/stair",10);
+        pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/stair_modeling_ros/pose",10);
 
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -64,7 +67,7 @@ namespace zion
 
         // init pcl and buffer
         cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-
+        stair_pose_.reset(new geometry_msgs::msg::Pose);
         // Initialize to an invalid index
         floor_index_ = -1;  
         level_index_ = -1;
@@ -238,6 +241,9 @@ namespace zion
     void StairModeling::reset()
     {
         // Clear Planes and Stair if needed
+        // Stair_ = Stair();
+        // cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        // stair_pose_.reset(new geometry_msgs::msg::Pose);
         Planes_.clear();
         debug_msg_ = "debug";
         floor_index_ = -1;  
@@ -302,7 +308,7 @@ namespace zion
 
     void StairModeling::getStair()
     {
-
+        
         // init stair
         Stair_ = Stair(Planes_);  
         Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
@@ -326,7 +332,7 @@ namespace zion
         }else{ // -> stair descending
             Stair_.type_ = 1; // 1 = downwards
             debug_msg_ = debug_msg_ + "\nStair type: Down";
-            Stair_.transition_point_.x = Stair_.Planes_[level_index_].center_.x + (Stair_.step_length_/2);
+            Stair_.transition_point_.x = Stair_.Planes_[floor_index_].center_.x + (Stair_.step_length_/2);
             // compute distance
             // If downwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the second plane's cloud
@@ -337,10 +343,46 @@ namespace zion
         // compute angle
         Stair_.step_angle_ = Utilities::rad2deg(std::atan2(Stair_.transition_point_.y,Stair_.transition_point_.x));
 
+
+
         // debug
         debug_msg_ = debug_msg_ + "\nHeight is:  " + std::to_string(Stair_.step_height_ );
         debug_msg_ = debug_msg_ + "\nDistance is:  " + std::to_string(Stair_.step_distance_);
     }
+
+
+    void StairModeling::getStairPose()
+{
+    geometry_msgs::msg::Pose pose;
+
+    stair_pose_->position.x = Stair_.transition_point_.x;
+    stair_pose_->position.y = Stair_.transition_point_.y;
+    stair_pose_->position.z = Stair_.transition_point_.z;
+
+    tf2::Matrix3x3 tf_rotation;
+    tf2::Quaternion tf_quaternion;
+    geometry_msgs::msg::Quaternion ros_quaternion;
+    tf_rotation.setValue(static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(0, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(0, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(0, 2)),
+                    static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 2)),
+                    static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 2)));
+
+    // tf_rotation.getRotation(tf_quaternion);
+    double roll ; double pitch ; double yaw;
+    tf_rotation.getEulerYPR(yaw,pitch,roll);
+    tf2::Quaternion q_rotation;
+    q_rotation.setRPY(0.,0.,pitch+(M_PI/2)); // pitch
+    // q_rotation.setRPY(0.,0.,0); // pitch
+    q_rotation.normalize();
+
+    stair_pose_->orientation = tf2::toMsg(q_rotation);
+//     RCLCPP_INFO(this->get_logger(),
+//                 "Received Pose message:\n"
+//                 "Position (x, y, z): %.2f, %.2f, %.2f\n"
+//                 "Orientation (x, y, z, w): %.2f, %.2f, %.2f, %.2f",
+//                 stair_pose_->position.x, stair_pose_->position.y, stair_pose_->position.z,
+//                 stair_pose_->orientation.x, stair_pose_->orientation.y, stair_pose_->orientation.z, stair_pose_->orientation.w);
+}
+
 
     void StairModeling::setStairTf()
     {
@@ -378,35 +420,29 @@ namespace zion
         printDebug();
     }
 
-    void StairModeling::publishEnvGeo(const std::string& cloud_frame)
+    void StairModeling::publishStair(const std::string& cloud_frame)
     {   
         
-        zion_msgs::msg::EnvGeoStamped env_geo_stamped_msg; //with or without ::msg ?
-        zion_msgs::msg::EnvGeo env_geo_msg;
+        zion_msgs::msg::StairStamped stair_stamped_msg; //with or without ::msg ?
+        zion_msgs::msg::Stair stair_msg;
         
-        env_geo_stamped_msg.header.frame_id = cloud_frame;
-        env_geo_stamped_msg.header.stamp = this->get_clock()->now();
+        // declare stair_stamped_msg
+        stair_stamped_msg.header.frame_id = cloud_frame;
+        stair_stamped_msg.header.stamp = this->get_clock()->now();
 
-        // declare env_geo_msg
-        if(stair_detected_){
-            env_geo_msg.stair.steps = 1;
-            env_geo_msg.stair.distance = Stair_.step_distance_;
-            env_geo_msg.stair.height = Stair_.step_height_;
-            env_geo_msg.stair.angle = Stair_.step_angle_;
-            env_geo_msg.stair.length = Stair_.step_length_;
-            env_geo_msg.stair.width = Stair_.step_width_;
-            env_geo_msg.plane.slope = 0;
-        }
-        else{
-            env_geo_msg.stair.steps = 0;
-            if(Planes_.size() == 1){
-                env_geo_msg.plane.slope = Planes_[0].slope_;
-            }
-        }
+        // declare stair_msg
+        // if(stair_detected_){
+            stair_stamped_msg.stair.direction = Stair_.type_;
+            stair_stamped_msg.stair.distance = Stair_.step_distance_;
+            stair_stamped_msg.stair.height = Stair_.step_height_;
+            stair_stamped_msg.stair.angle = Stair_.step_angle_;
+            stair_stamped_msg.stair.length = Stair_.step_length_;
+            stair_stamped_msg.stair.width = Stair_.step_width_;
+            stair_stamped_msg.stair.pose = *stair_pose_;
+        // }
 
-        // declare env_geo_stamped_msg
-        env_geo_stamped_msg.env_geo = env_geo_msg;
-        env_geo_pub_->publish(env_geo_stamped_msg);
+
+        stair_pub_->publish(stair_stamped_msg);
     }
 
     void StairModeling::publishHullsAsMarkerArray(const std::string& cloud_frame)
@@ -496,6 +532,15 @@ namespace zion
         }
     }
 
+    void StairModeling::publishStairPose(const std::string &cloud_frame)
+    {
+        geometry_msgs::msg::PoseStamped pose_stamped;
+        pose_stamped.header.frame_id = cloud_frame;
+        pose_stamped.header.stamp = this->get_clock()->now();;
+        pose_stamped.pose = *stair_pose_;
+        pose_pub_->publish(pose_stamped);
+    }
+
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
     {
             reset();
@@ -513,12 +558,14 @@ namespace zion
             // if stair detected set the stair instance and compute geometric parameters
             if(stair_detected_){
                 getStair();
-                setStairTf();
+                // setStairTf();
+                getStairPose();
+                            // Publish the processed point cloud and custom msgs
+                publishHullsAsMarkerArray(output_frame_);
+                publishStair(output_frame_);
+                publishStairPose(output_frame_);
             }
             
-            // Publish the processed point cloud and custom msgs
-            publishHullsAsMarkerArray(output_frame_);
-            publishEnvGeo(output_frame_);
 
             // debug msg
             if(debug_){

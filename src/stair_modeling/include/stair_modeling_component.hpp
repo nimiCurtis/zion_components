@@ -22,6 +22,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #include <tf2/transform_datatypes.h>
+#include <Eigen/Geometry>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
@@ -29,8 +30,7 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 
 //When using customn ros2 meseges, use onliu .hpp and small leters with '_' as a separation between words
-#include <zion_msgs/msg/env_geo_stamped.hpp>
-#include <zion_msgs/msg/env_geo.hpp>
+#include <zion_msgs/msg/stair_stamped.hpp>
 
 
 namespace zion
@@ -72,15 +72,17 @@ namespace zion
          * @param secs The seconds part of the timestamp.
          * @param nsecs The nanoseconds part of the timestamp.
          */
-        void publishEnvGeo(const std::string& cloud_frame);
+        void publishStair(const std::string& cloud_frame);
 
-
+        void publishStairPose(const std::string &cloud_frame);
         void getPlanes(pcl::PointCloud<pcl::PointXYZRGB>::Ptr);
 
         void findFloor();
         void calcPlaneSlope();
         void checkForValidStair();
         void getStair();
+        void getStairPose();
+
         void reset();
         void loadParams();
         void printDebug();
@@ -95,9 +97,11 @@ namespace zion
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_sub_;
 
         //publishers
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_pub_; ///< Publisher for the filtered pcl.
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr hull_marker_array_pub_; ///< Publisher to the hull topic.
-        rclcpp::Publisher<zion_msgs::msg::EnvGeoStamped>::SharedPtr env_geo_pub_; ///< Publisher to the env_geo topic.
+        rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
+        rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_; ///< Publisher to the pose topic.
+
+        geometry_msgs::msg::Pose::SharedPtr stair_pose_;
 
         // tf2_ros
         std::unique_ptr<tf2_ros::Buffer> tf_buffer_;

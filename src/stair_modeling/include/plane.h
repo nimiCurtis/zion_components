@@ -5,8 +5,10 @@
 #include <pcl/point_types.h>
 #include <pcl/ModelCoefficients.h>
 #include <vector>
+#include <Eigen/Dense>
 
 #include "utilities.h"
+
 
 class Plane
 {
@@ -34,6 +36,8 @@ public:
             *cloud_ = *cloud_in;
             processPlane();
     }
+
+    ~Plane(){}
 
     /**
      * @brief Processes the plane by setting its features and computing its convex hull.

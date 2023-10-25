@@ -1,4 +1,6 @@
+// #include "zion_components/plane.h"
 #include "plane.h"
+// #include <zion_components/plane.h>
 
 // Compute the convex hull of the projected plane
 void Plane::computePlaneHull()
@@ -66,7 +68,7 @@ void Plane::getMeasurements() {
         this->getPrincipalDirections();
 
     // move the points to the that reference frame
-    Eigen::Matrix4f cp2p(Eigen::Matrix4f::Identity());
+    Eigen::Matrix4f cp2p(Eigen::Matrix4f::Identity()); // trnasformtaion: cp2p = camera projected ==> plane
     cp2p.block<3,3>(0,0) = plane_dir_.transpose();
     cp2p.block<3,1>(0,3) = -1.f * (cp2p.block<3,3>(0,0) * centroid_.getVector3fMap().head<3>());
     pcl::PointCloud<pcl::PointXYZRGB> cPoints;
@@ -86,4 +88,6 @@ void Plane::getMeasurements() {
     center_.x = mean_diag(0);
     center_.y = mean_diag(1);
     center_.z = mean_diag(2);
+
+
 }
