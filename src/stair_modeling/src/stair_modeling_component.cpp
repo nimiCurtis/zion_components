@@ -58,8 +58,8 @@ namespace zion
         
         
         hull_marker_array_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/stair_modeling_ros/hull_marker_array",10);
-        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("/stair_modeling_ros/stair",10);
-        pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/stair_modeling_ros/pose",10);
+        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("/stair_modeling_ros/stair/raw",10);
+        pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/stair_modeling_ros/pose/raw",10);
 
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -431,16 +431,14 @@ namespace zion
         stair_stamped_msg.header.stamp = this->get_clock()->now();
 
         // declare stair_msg
-        // if(stair_detected_){
-            stair_stamped_msg.stair.direction = Stair_.type_;
-            stair_stamped_msg.stair.distance = Stair_.step_distance_;
-            stair_stamped_msg.stair.height = Stair_.step_height_;
-            stair_stamped_msg.stair.angle = Stair_.step_angle_;
-            stair_stamped_msg.stair.length = Stair_.step_length_;
-            stair_stamped_msg.stair.width = Stair_.step_width_;
-            stair_stamped_msg.stair.pose = *stair_pose_;
-        // }
 
+        stair_stamped_msg.stair.id = Stair_.type_;
+        stair_stamped_msg.stair.distance = Stair_.step_distance_;
+        stair_stamped_msg.stair.height = Stair_.step_height_;
+        stair_stamped_msg.stair.angle = Stair_.step_angle_;
+        stair_stamped_msg.stair.length = Stair_.step_length_;
+        stair_stamped_msg.stair.width = Stair_.step_width_;
+        stair_stamped_msg.stair.pose = *stair_pose_;
 
         stair_pub_->publish(stair_stamped_msg);
     }
@@ -566,6 +564,7 @@ namespace zion
                 publishStairPose(output_frame_);
             }
             
+
 
             // debug msg
             if(debug_){

@@ -38,7 +38,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
-find_package(PCL REQUIRED) ## See ROS REP2000 for expected PCL version
+find_package(PCL 1.10 REQUIRED) ## See ROS REP2000 for expected PCL version
 find_package(visualization_msgs REQUIRED)
 find_package(zion_msgs REQUIRED)
 
@@ -79,6 +79,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/include
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include
 )
+
 
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
