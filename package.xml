@@ -2,14 +2,16 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>zion_components</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <version>0.1.0</version>
+  <description>Zion components package</description>
   <maintainer email="nimicu21@gmail.com">nimrod</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache License 2.0</license>
+<url type="repository">https://github.com/nimiCurtis/zion_components.git</url>
 
-
+<!-- Declare ROS2 package build tool -->
   	<buildtool_depend>ament_cmake</buildtool_depend>
 	
+<!-- Declares ROS2 package name that is required at build time -->
 	<build_depend>rclcpp</build_depend>
 	<build_depend>rclcpp_components</build_depend>
 	<build_depend>rcutils</build_depend>
@@ -34,7 +36,8 @@
 	<build_depend>pcl_conversions</build_depend>
 	<build_depend>pcl</build_depend>
 	<build_depend>ros2launch</build_depend>
-  
+
+<!-- Declares ROS2 package name that is required at executaion time -->
   	<exec_depend>launch_ros</exec_depend>
 	<exec_depend>zed_interfaces</exec_depend>
 	<exec_depend>rclcpp</exec_depend>
@@ -56,6 +59,8 @@
 	<exec_depend>diagnostic_updater</exec_depend>
 	<exec_depend>visualization_msgs</exec_depend>
 	<exec_depend>robot_localization</exec_depend>
+
+<!-- Declare ROS2 package testing tools -->
 	<test_depend>ament_lint_auto</test_depend>
 	<test_depend>ament_cmake_copyright</test_depend>
 	<test_depend>ament_cmake_cppcheck</test_depend>
@@ -67,7 +72,7 @@
 
 
 
-
+<!-- Declares ROS2 package name that is needed as part of some build interface it exports -->
   <export>
     <build_type>ament_cmake</build_type>
   </export>
