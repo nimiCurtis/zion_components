@@ -1,17 +1,17 @@
 #ifndef STAIR_H
 #define STAIR_H
 
-// general includes
+// Third party libraries
 #include <vector>
 
-// custom includes
+// Custom includes
 #include "plane.h"
 #include "utilities.h"
 
 // Parameters for height of the stairs, given by the regulations:
-const float k_height_min = 0.08f ;  // Min height 
-const float k_height_max = 1.f ; //1.f; 0.2f Max height 
-const float k_length_min = 0.1f; // Min length is 28 cm (no max length)
+const float k_height_min = 0.08f;  // Min height 
+const float k_height_max = 1.f;    //1.f; 0.2f Max height 
+const float k_length_min = 0.1f;   // Min length is 20 cm (no max length)
 
 class Stair
 {
@@ -56,6 +56,11 @@ public:
      */
     void calcStairHeightAndDist(double yThreshold, int x_neighbors);
 
+    /**
+     * @brief Check if the hegith deffernce is stand with the stairs regulations and standards.
+     * @param source_plane_h The height of the source plane.
+     * @param target_plane_h The height of the target plane.
+     */
     static bool checkValidHeight(float source_plane_h, float target_plane_h);
 
     // Members:

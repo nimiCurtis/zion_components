@@ -1,26 +1,10 @@
+// Custom includes
 #include "utilities.h"
 
-#include <pcl/common/transforms.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/crop_box.h>
-#include <pcl/filters/statistical_outlier_removal.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/ModelCoefficients.h>
-#include <pcl/filters/project_inliers.h>
-#include <pcl/surface/convex_hull.h>
-#include <pcl/surface/mls.h>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <Eigen/Core>
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
-
 void Utilities::getCloudByInliers(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud_in,
-                                  pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud_out,
-                                  const pcl::PointIndices::Ptr &inliers,
-                                  bool negative, bool organized)
+                                pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud_out,
+                                const pcl::PointIndices::Ptr &inliers,
+                                bool negative, bool organized)
 {   
     pcl::ExtractIndices<pcl::PointXYZRGB> extract;
     extract.setNegative(negative); // true = inverted behave
@@ -31,16 +15,16 @@ void Utilities::getCloudByInliers(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &
 }
 
 void Utilities::transformCloud(Eigen::Affine3d c2cp,
-                               const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &input_cloud,
-                               pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud)
+                            const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &input_cloud,
+                            pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud)
 {
     pcl::transformPointCloud(*input_cloud, *output_cloud, c2cp);
 }
 
 // Voxelization downsampling method
 void Utilities::voxelizingDownsample(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &input_cloud,
-                                     pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud,
-                                     float leaf_xy, float leaf_z)
+                                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud,
+                                    float leaf_xy, float leaf_z)
 {
     pcl::VoxelGrid<pcl::PointXYZRGB> filter;
     filter.setInputCloud(input_cloud);
@@ -50,7 +34,7 @@ void Utilities::voxelizingDownsample(const pcl::PointCloud<pcl::PointXYZRGB>::Pt
 
 // smoothing method
 void Utilities::smoothing(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &input_cloud,
-                          pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud)
+                        pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud)
 {
     // Smoothing object (we choose what point types we want as input and output).
 
@@ -67,8 +51,8 @@ void Utilities::smoothing(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &input_cl
 }
 
 void Utilities::cropping(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &input_cloud,
-                         pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud,
-                         double min_x, double max_x, double min_y, double max_y, double min_z, double max_z)
+                        pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud,
+                        double min_x, double max_x, double min_y, double max_y, double min_z, double max_z)
 {
     // Define cropping box dimensions
     double xmin = min_x, xmax = max_x, ymin = min_y, ymax = max_y, zmin = min_z, zmax = max_z;
@@ -214,8 +198,3 @@ void Utilities::colorize(const pcl::PointCloud<pcl::PointXYZRGB> &pc,
         pc_colored.points.emplace_back(pt_tmp);
     }
 }
-
-// int main(int argc, char *argv[])
-// {
-//     return 0;
-// }

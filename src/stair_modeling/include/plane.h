@@ -1,42 +1,58 @@
 #ifndef PLANE_H
 #define PLANE_H
 
+// Third party libraries
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/ModelCoefficients.h>
-#include <vector>
 #include <Eigen/Dense>
 
+// Custom utilities for the Plane class
 #include "utilities.h"
 
-
+/**
+ * @class Plane
+ * @brief Represents a geometric plane and provides utilities for computing plane characteristics.
+ *
+ * The Plane class encapsulates a point cloud representation of a plane, providing methods for 
+ * computing various attributes such as the plane's convex hull, slope, centroid, and principal 
+ * directions. The class also provides tools for projecting the plane to 2D and calculating 
+ * measurements related to the plane.
+ */
 class Plane
 {
 public:
 
+    /**
+     * @brief Default constructor. Initializes empty clouds and other members.
+     */
     Plane(){
-            cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-            cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-            hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-            plane_dir_.setZero();
+        cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        plane_dir_.setZero();
     }
 
     /**
      * @brief Construct a new Plane object and processes it.
-     * @param cloud_in Input point cloud.
+     * 
+     * @param cloud_in Input point cloud representing the plane.
      * @param plane_coeff Plane coefficients.
      */
     Plane(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, pcl::ModelCoefficients::Ptr plane_coeff) {
-            plane_coefficients_ = plane_coeff;
-            cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>() );
-            cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-            hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-            plane_dir_.setZero();
+        plane_coefficients_ = plane_coeff;
+        cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        plane_dir_.setZero();
 
-            *cloud_ = *cloud_in;
-            processPlane();
+        *cloud_ = *cloud_in;
+        processPlane();
     }
 
+    /**
+     * @brief Default destructor.
+     */
     ~Plane(){}
 
     /**
@@ -49,22 +65,22 @@ public:
      */
     void calcPlaneSlope();
 
-    // Members:
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr hull_;
-    pcl::PointXYZRGB centroid_; // Plane centroid
-    pcl::PointXYZRGB center_; // Rectangle center
+    // Public Members:
 
-    pcl::ModelCoefficients::Ptr plane_coefficients_;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected_;
-    std::vector<float> features_;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_; // Original point cloud of the plane
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr hull_;  // Convex hull of the projected plane
+    pcl::PointXYZRGB centroid_;                    // Centroid of the plane
+    pcl::PointXYZRGB center_;                      // Center of the bounding rectangle
 
-    int type_;
-    float slope_;
-    float width_;
-    float length_;
-    Eigen::Matrix3f plane_dir_;
+    pcl::ModelCoefficients::Ptr plane_coefficients_;   // Plane coefficients
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected_;  // 2D projected cloud of the plane
+    std::vector<float> features_; // Vector to store computed features of the plane
 
+    int type_;                // Type identifier (if needed for categorizing planes)
+    float slope_;             // Slope of the plane in degrees
+    float width_;             // Width measurement of the plane
+    float length_;            // Length measurement of the plane
+    Eigen::Matrix3f plane_dir_;   // PCA direction of the plane
 
 private:
 
@@ -79,17 +95,17 @@ private:
     void projectPlaneTo2D();
 
     /**
-     * @brief Get plane centroid.
+     * @brief Computes the centroid of the plane's points.
      */
     void getCentroid();
 
     /**
-     * @brief Get plane PCA.
+     * @brief Computes the principal directions of the plane using PCA.
      */
     void getPrincipalDirections();
 
     /**
-     * @brief Get plane width and length with relate to the pca direction.
+     * @brief Computes measurements of the plane like width and length based on PCA directions.
      */
     void getMeasurements();
 
