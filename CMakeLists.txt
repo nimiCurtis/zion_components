@@ -38,10 +38,11 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
-find_package(PCL 1.10 REQUIRED) ## See ROS REP2000 for expected PCL version
 find_package(visualization_msgs REQUIRED)
 find_package(zion_msgs REQUIRED)
 
+find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED QUIET COMPONENTS common features filters io segmentation surface sample_consensus) 
 
 set(DEPENDENCIES
   rclcpp
@@ -56,6 +57,7 @@ set(DEPENDENCIES
   sensor_msgs
   geometry_msgs
   visualization_msgs
+  EIGEN3
   PCL
   ${TM_DEP}
 )
