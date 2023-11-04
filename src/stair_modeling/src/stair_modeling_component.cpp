@@ -1,5 +1,6 @@
 // Custom includes
 #include "stair_modeling_component.hpp"
+
 namespace zion
 {
     StairModeling::StairModeling(const rclcpp::NodeOptions &options)
@@ -15,13 +16,32 @@ namespace zion
         //load params
         loadParams();
 
-        // subscribers and publishers
-        rclcpp::QoS qos_profile_pcl(1);
+        // init pcl and det buffer
+        cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        stair_pose_.reset(new geometry_msgs::msg::Pose);
+        det_buffer_ = std::shared_ptr<vision_msgs::msg::Detection2D>();
+
+        // Subscribers and Publishers
+
+        // Callback Group
+        rclcpp::SubscriptionOptions options1;
+        rclcpp::CallbackGroup::SharedPtr cbg1 = 
+            this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);        
+        options1.callback_group = cbg1;
+
+        // Pcl sub
+        rclcpp::QoS qos_profile_pcl(10);
         // qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-        pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(filtered_point_cloud_topic_, qos_profile_pcl,
-            std::bind(&StairModeling::pclCallback, this, std::placeholders::_1));
+        pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(filtered_point_cloud_topic_,qos_profile_pcl,
+            std::bind(&StairModeling::pclCallback, this, std::placeholders::_1),
+            options1);
 
+        rclcpp::QoS qos_profile_det(10);
+        obj_det_sub_  = this->create_subscription<vision_msgs::msg::Detection2D>("/zion/stair_detection/detection",qos_profile_det,
+            std::bind(&StairModeling::detCallback, this, std::placeholders::_1),
+            options1);
+        
         hull_marker_array_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("~/planes_hull",10);
         stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",10);
         pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("~/pose",10);
@@ -30,12 +50,14 @@ namespace zion
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
-        // init pcl and buffer
-        cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        stair_pose_.reset(new geometry_msgs::msg::Pose);
+
         // Initialize to an invalid index
         floor_index_ = -1;  
         level_index_ = -1;
+
+        use_det_ = false;
+        det_found_ = false;
+        planes_empty_ = true;
 
         colors_={
         255., 0.0, 0.0, // red  
@@ -121,6 +143,7 @@ namespace zion
         floor_index_ = -1;  
         level_index_ = -1;
         stair_detected_ = false;
+        planes_empty_ = true;
     }
 
     void StairModeling::getPlanes(pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud)
@@ -170,61 +193,74 @@ namespace zion
                     Utilities::getCloudByInliers(outlier_points, outlier_points, plane_indices, true, false); 
                     debug_msg_ = debug_msg_ + "\nPlane " + std::to_string(i) + " has: " + std::to_string(plane_points->points.size()) + " points";
                     
-                    // get the first plane 
-                    if (Planes_.size()==0){
-                        Plane plane = Plane(plane_points_clustered,plane_coefficients);
-                        plane.calcPlaneSlope();
-                        Planes_.push_back(plane);
-                    }
-                    // get the second plane
-                    else{
-                        // check for the height validation
-                        // if height difference is in valid range , pushback the second plane
-                        if (Stair::checkValidHeight(Planes_[0].plane_coefficients_->values[3],plane_coefficients->values[3])){
+                    if (!plane_points_clustered->empty()){
+                        // get the first plane 
+                        if (Planes_.size()==0){
                             Plane plane = Plane(plane_points_clustered,plane_coefficients);
                             plane.calcPlaneSlope();
                             Planes_.push_back(plane);
                         }
-                        // if not, keep in while loop
+                        // get the second plane
                         else{
-                            i--;
-                        } 
-                    } 
-                }
+                            // check for the height validation
+                            // if height difference is in valid range , pushback the second plane
+                            if (Stair::checkValidHeight(Planes_[0].plane_coefficients_->values[3],plane_coefficients->values[3])){
+                                Plane plane = Plane(plane_points_clustered,plane_coefficients);
+                                plane.calcPlaneSlope();
+                                Planes_.push_back(plane);
+                            }
+                            // if not, keep in while loop
+                            else{
+                                i--;
+                            } 
+                        }
+                    }
+                    else{
+                        // Handle the case when there are no valid indices
+                        RCLCPP_WARN(get_logger(), "No valid indices provided for projection.");
+                        break;
+                    }
             } // while
 
 
-            // planes features for debug
-            for (size_t i = 0; i < Planes_.size(); ++i) {
-                            debug_msg_ = debug_msg_ + "\n------- Plane: " + std::to_string(i+1) + "-------";
+            if (!Planes_.empty()){
+                planes_empty_ = false;
+                // planes features for debug
+                for (size_t i = 0; i < Planes_.size(); ++i) {
+                                debug_msg_ = debug_msg_ + "\n------- Plane: " + std::to_string(i+1) + "-------";
 
-                            debug_msg_ = debug_msg_ +  
-                            "\ncoefficients: [" + std::to_string(Planes_[i].plane_coefficients_->values[0]) + " "
-                                                + std::to_string(Planes_[i].plane_coefficients_->values[1]) + " "
-                                                + std::to_string(Planes_[i].plane_coefficients_->values[2]) + " "
-                                                + std::to_string(Planes_[i].plane_coefficients_->values[3]) + "]";
+                                debug_msg_ = debug_msg_ +  
+                                "\ncoefficients: [" + std::to_string(Planes_[i].plane_coefficients_->values[0]) + " "
+                                                    + std::to_string(Planes_[i].plane_coefficients_->values[1]) + " "
+                                                    + std::to_string(Planes_[i].plane_coefficients_->values[2]) + " "
+                                                    + std::to_string(Planes_[i].plane_coefficients_->values[3]) + "]";
 
-                            debug_msg_ = debug_msg_ + 
-                            "\ncentroid: " +"x: " + std::to_string(Planes_[i].centroid_.x) + " | "
-                                        +"y: " + std::to_string(Planes_[i].centroid_.y) + " | "
-                                        +"z: " + std::to_string(Planes_[i].centroid_.z);
-                            
-                            debug_msg_ = debug_msg_ +
-                            "\nPCA rotation matrix: " +" \n[" + std::to_string(Planes_[i].plane_dir_.col(0)[0]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[0])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[0])
-                                                    +"\n " + std::to_string(Planes_[i].plane_dir_.col(0)[1]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[1])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[1])
-                                                    +"\n " + std::to_string(Planes_[i].plane_dir_.col(0)[2]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[2])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[2])+"]";
+                                debug_msg_ = debug_msg_ + 
+                                "\ncentroid: " +"x: " + std::to_string(Planes_[i].centroid_.x) + " | "
+                                            +"y: " + std::to_string(Planes_[i].centroid_.y) + " | "
+                                            +"z: " + std::to_string(Planes_[i].centroid_.z);
+                                
+                                debug_msg_ = debug_msg_ +
+                                "\nPCA rotation matrix: " +" \n[" + std::to_string(Planes_[i].plane_dir_.col(0)[0]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[0])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[0])
+                                                        +"\n " + std::to_string(Planes_[i].plane_dir_.col(0)[1]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[1])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[1])
+                                                        +"\n " + std::to_string(Planes_[i].plane_dir_.col(0)[2]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[2])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[2])+"]";
 
-                            debug_msg_ = debug_msg_ + 
-                            "\nbounding rect center: " +"x: " + std::to_string(Planes_[i].center_.x) + " | "
-                                        +"y: " + std::to_string(Planes_[i].center_.y) + " | "
-                                        +"z: " + std::to_string(Planes_[i].center_.z);
-                            
-                            debug_msg_ = debug_msg_ + 
-                            "\nwidth: " + std::to_string(Planes_[i].width_) + " | "
-                            +"lenght: " + std::to_string(Planes_[i].length_);
-                            
-                            debug_msg_ = debug_msg_ + "\n-----";
-
+                                debug_msg_ = debug_msg_ + 
+                                "\nbounding rect center: " +"x: " + std::to_string(Planes_[i].center_.x) + " | "
+                                            +"y: " + std::to_string(Planes_[i].center_.y) + " | "
+                                            +"z: " + std::to_string(Planes_[i].center_.z);
+                                
+                                debug_msg_ = debug_msg_ + 
+                                "\nwidth: " + std::to_string(Planes_[i].width_) + " | "
+                                +"lenght: " + std::to_string(Planes_[i].length_);
+                                
+                                debug_msg_ = debug_msg_ + "\n-----";
+                }
+            }
+            else{
+                planes_empty_ = true;
+                debug_msg_ = debug_msg_ + "\nNo planes!" + "\n-----";
+            }
         }
     }
 
@@ -233,40 +269,73 @@ namespace zion
     void StairModeling::findFloor() 
     {
 
-        float min_avg_x = std::numeric_limits<float>::max();
+            // If there is more then 1 planes.
+            if (Planes_.size()>1){
 
-        // Loop through each plane
+                // If not using stair detection -> find the floor based on the x's values
+                if (!use_det_){
+                    float min_avg_x = std::numeric_limits<float>::max();
 
-        if (Planes_.size()>1){
-            for (size_t i = 0; i < Planes_.size(); ++i) {
-                const auto& plane = Planes_[i];
+                    // Loop through each plane
+                    for (size_t i = 0; i < Planes_.size(); ++i) {
+                        const auto& plane = Planes_[i];
 
-                // Sort the points based on their x-values
-                std::sort(plane.cloud_->points.begin(), plane.cloud_->points.end(),
-                        [](const pcl::PointXYZRGB &a, const pcl::PointXYZRGB &b) {
-                            return a.x < b.x;
-                        });
+                        // Sort the points based on their x-values
+                        std::sort(plane.cloud_->points.begin(), plane.cloud_->points.end(),
+                                [](const pcl::PointXYZRGB &a, const pcl::PointXYZRGB &b) {
+                                    return a.x < b.x;
+                                });
 
-                // Calculate the average 'X' value of the k_neighbors_ smallest x-values
-                float avg_x = 0.0;
-                for (int j = 0; j < k_neighbors_; ++j) {
-                    avg_x += plane.cloud_->points[j].x;
+                        // Calculate the average 'X' value of the k_neighbors_ smallest x-values
+                        float avg_x = 0.0;
+                        for (int j = 0; j < k_neighbors_; ++j) {
+                            avg_x += plane.cloud_->points[j].x;
+                        }
+                        avg_x /= k_neighbors_;
+
+                        // Update the closest plane index based on the avg_x
+                        ///// continueee from here
+                        if (avg_x < min_avg_x) {
+                            min_avg_x = avg_x;
+                            floor_index_ = static_cast<int>(i);
+                        }
+                    }
+                    if (floor_index_==0){ level_index_ = 1;}
+                    else{ level_index_ = 0;}
                 }
-                avg_x /= k_neighbors_;
-
-                // Update the closest plane index based on the avg_x
-                ///// continueee from here
-
-                if (avg_x < min_avg_x) {
-                    min_avg_x = avg_x;
-                    floor_index_ = static_cast<int>(i);
+                // Else find the floor based on the stair detection result
+                else{
+                    float min_height = std::numeric_limits<float>::max();
+                    int min_index = -1;
+                    // Loop through each plane
+                    // And find the index of the lowest plane
+                    for (size_t i = 0; i < Planes_.size(); ++i) {
+                        const auto& plane = Planes_[i];
+                        if (plane.plane_coefficients_->values[3]<min_height){
+                        min_index=i;
+                        min_height = plane.plane_coefficients_->values[3];
+                        }
+                    }
+                    std::string stair_id = det_buffer_->results.begin()->id;
+                    // If stair ascending -> the lowest plane is the floor
+                    if(stair_id=="SSA"){
+                        floor_index_ = min_index;
+                        if (floor_index_==0){ level_index_ = 1;}
+                        else{level_index_ = 0;}
+                    }
+                    // If stair descending -> the lowest plane is the level
+                    else{
+                        level_index_ = min_index;
+                        if (floor_index_==0){ level_index_ = 1;}
+                        else{level_index_ = 0;}
+                    }
                 }
             }
-            if (floor_index_==0){ level_index_ = 1;}
-            else{ level_index_ = 0;}
-        }else{
-            floor_index_=0;
-        }
+            // In case of single plane -> It is the floor!
+            else{
+                floor_index_=0;
+            }
+        
         
         // set planes type 
         if (floor_index_!=-1){Planes_[floor_index_].type_ = 0;}
@@ -287,7 +356,6 @@ namespace zion
 
     void StairModeling::getStair()
     {
-        
         // init stair
         Stair_ = Stair(Planes_);  
         Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
@@ -517,6 +585,20 @@ namespace zion
         pose_pub_->publish(pose_stamped);
     }
 
+    void StairModeling::detCallback(const vision_msgs::msg::Detection2D::SharedPtr det_msg)
+    {
+        det_buffer_ = det_msg;
+        // RCLCPP_INFO(get_logger(),"Got detection msg!");
+        if (det_buffer_->results.size() == 0){
+            debug_msg_ = debug_msg_ + "\nDetection empty" ;
+            det_found_ = false;
+        }
+        else{
+            debug_msg_ = debug_msg_ + "\nDetection is: " +  det_buffer_->results.begin()->id.c_str();
+            det_found_ = true;
+        }
+    }
+
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
     {
             reset();
@@ -524,31 +606,66 @@ namespace zion
             // from ros msg 
             pcl::fromROSMsg(*pcl_msg, *cloud_);
 
-            // RANSAC-based plane segmentation
-            getPlanes(cloud_);
-
-            // find the floor plane
-            findFloor();
-            checkForValidStair();
-
-            // if stair detected set the stair instance and compute geometric parameters
-            if(stair_detected_){
-                getStair();
-                // setStairTf();
-                getStairPose();
-                            // Publish the processed point cloud and custom msgs
-                publishHullsAsMarkerArray(output_frame_);
-                publishStair(output_frame_);
-                publishStairPose(output_frame_);
-            }
+            // RCLCPP_INFO(get_logger(),"Got pcl msg!");
             
 
+
+
+            if (!use_det_){
+                // RANSAC-based plane segmentation
+                getPlanes(cloud_);
+
+                if(!planes_empty_){
+                    // find the floor plane
+                    findFloor();
+                    checkForValidStair();
+
+                    // if stair detected set the stair instance and compute geometric parameters
+                    if(stair_detected_){
+                        getStair();
+                        // setStairTf();
+                        getStairPose();
+                                    // Publish the processed point cloud and custom msgs
+                        publishHullsAsMarkerArray(output_frame_);
+                        publishStair(output_frame_);
+                        publishStairPose(output_frame_);
+                    }
+                }
+            }
+            else{
+                // RCLCPP_INFO(get_logger(), "Detection found = %s", det_found_ ? "true" : "false");
+                if (det_found_){
+                    if(!planes_empty_){
+                        // find the floor plane
+                        findFloor();
+                        checkForValidStair();
+
+                        // if stair detected set the stair instance and compute geometric parameters
+                        if(stair_detected_){
+                            getStair();
+                            // setStairTf();
+                            getStairPose();
+                            // Publish the processed point cloud and custom msgs
+                            publishHullsAsMarkerArray(output_frame_);
+                            publishStair(output_frame_);
+                            publishStairPose(output_frame_);
+                        }
+                    }
+                }   
+            }
+
+
+            
+
+            det_found_ = false;
 
             // debug msg
             if(debug_){
                 printDebug();
             }
     }
+
+
 
 } // namespace
 

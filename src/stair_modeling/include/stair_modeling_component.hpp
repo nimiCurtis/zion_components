@@ -47,6 +47,7 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <vision_msgs/msg/detection2_d.hpp>
 
 // Custom includes
 #include "utilities.h"
@@ -83,6 +84,13 @@ namespace zion
          * @param pcl_msg Point cloud message received from a subscribed topic.
          */
         void pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg);
+
+        /**
+         * @brief Callback function for processing received detection_msg.
+         * @param det_msg Detection2D message received from a subscribed topic.
+         */
+        void detCallback(const vision_msgs::msg::Detection2D::SharedPtr pcl_msg);
+
 
         /**
          * @brief Publishes the convex hulls of detected planes as a MarkerArray.
@@ -173,12 +181,12 @@ namespace zion
         std::vector<double> colors_; ///< Vector storing colors for visualization.
 
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_sub_; ///< Subscription to the point cloud topic.
+        rclcpp::Subscription<vision_msgs::msg::Detection2D>::SharedPtr obj_det_sub_; ///< Subscription to the detection topic.
 
         // Publishers
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr hull_marker_array_pub_; ///< Publisher to the hull topic.
         rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_; ///< Publisher to the stair pose topic.
-
         geometry_msgs::msg::Pose::SharedPtr stair_pose_; ///< Pose of the detected stair.
 
         // tf2_ros
@@ -191,6 +199,7 @@ namespace zion
         // PointCloud objects and flags
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;   ///< Input point cloud.
         std::shared_ptr<sensor_msgs::msg::PointCloud2> pcl_buffer_;  ///< Buffer for storing the processed point cloud.
+        std::shared_ptr<vision_msgs::msg::Detection2D> det_buffer_;
         bool stair_detected_; ///< Flag indicating whether a stair has been detected.
         int floor_index_; ///< Index of the detected floor plane.
         int level_index_; ///< Index of the detected level plane.
@@ -214,6 +223,9 @@ namespace zion
 
         std::string output_frame_; ///< Name of the output frame for the processed data.
 
+        bool use_det_; ///< Using the stair detection model for predictiong single stair.
+        bool planes_empty_; ///< No planes are found. True == there is no planes found from segmentation.
+        bool det_found_; ///< Effective only if use_det is true. Detection found boolean. True == there is a detection. 
         bool debug_; ///< Flag for debugging mode.
         std::string debug_msg_; ///< Message string for debugging.
     };

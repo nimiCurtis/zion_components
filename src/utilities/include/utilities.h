@@ -150,6 +150,15 @@ public:
     static void colorize(const pcl::PointCloud<pcl::PointXYZRGB> &pc,
                          pcl::PointCloud<pcl::PointXYZRGB> &pc_colored,
                          const std::vector<int> &color);
+    
+    /**
+     * @brief Colorizes a point cloud with a given color.
+     * @param pc Input point cloud.
+     * @param pc_colored Output colored point cloud.
+     * @param color Vector containing RGB values.
+     */
+    static bool getPointFromPixelCoordinates(pcl::PointXYZRGB& point, int pixel_x, int pixel_y, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pcl_cloud);
+
 };
 
 #endif // UTILITIES_H
