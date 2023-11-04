@@ -74,7 +74,6 @@ public:
 
     pcl::ModelCoefficients::Ptr plane_coefficients_;   // Plane coefficients
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected_;  // 2D projected cloud of the plane
-    std::vector<float> features_; // Vector to store computed features of the plane
 
     int type_;                // Type identifier (if needed for categorizing planes)
     float slope_;             // Slope of the plane in degrees

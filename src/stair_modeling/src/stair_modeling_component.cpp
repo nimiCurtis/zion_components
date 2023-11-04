@@ -23,11 +23,16 @@ namespace zion
 
         // Subscribers and Publishers
 
-        // Callback Group
+        // Callback Groups
         rclcpp::SubscriptionOptions options1;
         rclcpp::CallbackGroup::SharedPtr cbg1 = 
             this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);        
         options1.callback_group = cbg1;
+
+        rclcpp::SubscriptionOptions options2;
+        rclcpp::CallbackGroup::SharedPtr cbg2 = 
+            this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);        
+        options2.callback_group = cbg2;
 
         // Pcl sub
         rclcpp::QoS qos_profile_pcl(10);
@@ -43,9 +48,10 @@ namespace zion
             options1);
         
         hull_marker_array_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("~/planes_hull",10);
-        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",10);
         pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("~/pose",10);
-
+        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",10);
+        stair_det_fused_pub_ = this->create_publisher<zion_msgs::msg::StairDetStamped>("~/stair_fused",10);
+        
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -55,7 +61,6 @@ namespace zion
         floor_index_ = -1;  
         level_index_ = -1;
 
-        use_det_ = false;
         det_found_ = false;
         planes_empty_ = true;
 
@@ -80,6 +85,11 @@ namespace zion
         this->declare_parameter("debug", false);
         this->get_parameter("debug", debug_);
         RCLCPP_INFO(get_logger(),"* debug: %s", debug_ ? "true" : "false");
+
+        // Debug
+        this->declare_parameter("use_det", false);
+        this->get_parameter("use_det", use_det_);
+        RCLCPP_INFO(get_logger(),"* use_det: %s", use_det_ ? "true" : "false");
 
         // Segmentation Parameters
         this->declare_parameter("segmentation.distance_threshold", 0.05);
@@ -252,7 +262,7 @@ namespace zion
                                 
                                 debug_msg_ = debug_msg_ + 
                                 "\nwidth: " + std::to_string(Planes_[i].width_) + " | "
-                                +"lenght: " + std::to_string(Planes_[i].length_);
+                                +"length: " + std::to_string(Planes_[i].length_);
                                 
                                 debug_msg_ = debug_msg_ + "\n-----";
                 }
@@ -326,8 +336,8 @@ namespace zion
                     // If stair descending -> the lowest plane is the level
                     else{
                         level_index_ = min_index;
-                        if (floor_index_==0){ level_index_ = 1;}
-                        else{level_index_ = 0;}
+                        if (level_index_==0){ floor_index_ = 1;}
+                        else{floor_index_ = 0;}
                     }
                 }
             }
@@ -489,6 +499,30 @@ namespace zion
         stair_pub_->publish(stair_stamped_msg);
     }
 
+        void StairModeling::publishStairWithDet(const std::string& cloud_frame)
+    {   
+        
+        zion_msgs::msg::StairDetStamped stair_det_stamped_msg; //with or without ::msg ?
+        
+        // declare stair_stamped_msg
+        stair_det_stamped_msg.header.frame_id = cloud_frame;
+        stair_det_stamped_msg.header.stamp = this->get_clock()->now();
+
+        // declare stair_msg
+
+        stair_det_stamped_msg.stair.id = Stair_.type_;
+        stair_det_stamped_msg.stair.distance = Stair_.step_distance_;
+        stair_det_stamped_msg.stair.height = Stair_.step_height_;
+        stair_det_stamped_msg.stair.angle = Stair_.step_angle_;
+        stair_det_stamped_msg.stair.length = Stair_.step_length_;
+        stair_det_stamped_msg.stair.width = Stair_.step_width_;
+        stair_det_stamped_msg.stair.pose = *stair_pose_;
+
+        stair_det_stamped_msg.bbox = det_buffer_->bbox;
+
+        stair_det_fused_pub_->publish(stair_det_stamped_msg);
+    }
+
     void StairModeling::publishHullsAsMarkerArray(const std::string& cloud_frame)
     {
 
@@ -607,9 +641,6 @@ namespace zion
             pcl::fromROSMsg(*pcl_msg, *cloud_);
 
             // RCLCPP_INFO(get_logger(),"Got pcl msg!");
-            
-
-
 
             if (!use_det_){
                 // RANSAC-based plane segmentation
@@ -627,14 +658,21 @@ namespace zion
                         getStairPose();
                                     // Publish the processed point cloud and custom msgs
                         publishHullsAsMarkerArray(output_frame_);
-                        publishStair(output_frame_);
                         publishStairPose(output_frame_);
+                        publishStair(output_frame_);
+
                     }
                 }
             }
             else{
                 // RCLCPP_INFO(get_logger(), "Detection found = %s", det_found_ ? "true" : "false");
                 if (det_found_){
+                    debug_msg_ = debug_msg_ + "\nUsing Stair detection Node -> Detection found";   
+
+                    // RANSAC-based plane segmentation
+                    getPlanes(cloud_);
+                                // debug msg
+
                     if(!planes_empty_){
                         // find the floor plane
                         findFloor();
@@ -647,15 +685,15 @@ namespace zion
                             getStairPose();
                             // Publish the processed point cloud and custom msgs
                             publishHullsAsMarkerArray(output_frame_);
-                            publishStair(output_frame_);
                             publishStairPose(output_frame_);
+                            publishStairWithDet(output_frame_);
                         }
                     }
+                }
+                else{
+                    debug_msg_ = debug_msg_ + "\nUsing Stair detection Node -> No detection found yet";
                 }   
             }
-
-
-            
 
             det_found_ = false;
 

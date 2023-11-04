@@ -56,6 +56,7 @@
 #include "visibility_control.hpp"
 #include <zion_msgs/msg/stair.hpp>
 #include <zion_msgs/msg/stair_stamped.hpp>
+#include <zion_msgs/msg/stair_det_stamped.hpp>
 
 namespace zion
 {
@@ -99,18 +100,24 @@ namespace zion
         void publishHullsAsMarkerArray(const std::string& cloud_frame);
 
         /**
-         * @brief Publishes the the Stair msgs.
-         * @param cloud_frame The frame ID of the point cloud.
-         */
-        void publishStair(const std::string& cloud_frame);
-
-        /**
          * @brief Publishes the detected stair properties to a ROS topic.
          * This function takes the properties of the detected stair and constructs a message which 
          * is then published to a ROS topic for further use or visualization.
          * @param cloud_frame The frame ID associated with the detected stair.
          */
         void publishStairPose(const std::string &cloud_frame);
+
+        /**
+         * @brief Publishes the the Stair msgs.
+         * @param cloud_frame The frame ID of the point cloud.
+         */
+        void publishStair(const std::string& cloud_frame);
+
+        /**
+         * @brief Publishes the the StairDet msgs.
+         * @param cloud_frame The frame ID of the point cloud.
+         */
+        void publishStairWithDet(const std::string& cloud_frame);
 
         /**
          * @brief Loads parameters from the parameter server.
@@ -185,8 +192,9 @@ namespace zion
 
         // Publishers
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr hull_marker_array_pub_; ///< Publisher to the hull topic.
-        rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_; ///< Publisher to the stair pose topic.
+        rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
+        rclcpp::Publisher<zion_msgs::msg::StairDetStamped>::SharedPtr stair_det_fused_pub_; ///< Publisher to the stair topic.
         geometry_msgs::msg::Pose::SharedPtr stair_pose_; ///< Pose of the detected stair.
 
         // tf2_ros
