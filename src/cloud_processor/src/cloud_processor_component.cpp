@@ -97,7 +97,8 @@ namespace zion
             // Lookup for the transformation
             base_projected2camera = tf_buffer_->lookupTransform(
                   output_frame_, input_frame_,
-                  tf2::TimePointZero);
+                  tf2::TimePointZero,
+                  50ms);
 
             // Convert ROS transform to Eigen transform
             c2cp = tf2::transformToEigen(base_projected2camera);

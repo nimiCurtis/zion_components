@@ -26,7 +26,7 @@ namespace zion
         // Callback Groups
         rclcpp::SubscriptionOptions options1;
         rclcpp::CallbackGroup::SharedPtr cbg1 = 
-            this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);        
+            this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive); 
         options1.callback_group = cbg1;
 
         rclcpp::SubscriptionOptions options2;
@@ -36,21 +36,33 @@ namespace zion
 
         // Pcl sub
         rclcpp::QoS qos_profile_pcl(10);
-        // qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        // qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(filtered_point_cloud_topic_,qos_profile_pcl,
             std::bind(&StairModeling::pclCallback, this, std::placeholders::_1),
             options1);
 
         rclcpp::QoS qos_profile_det(10);
+        qos_profile_det.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         obj_det_sub_  = this->create_subscription<vision_msgs::msg::Detection2D>("/zion/stair_detection/detection",qos_profile_det,
             std::bind(&StairModeling::detCallback, this, std::placeholders::_1),
-            options1);
-        
-        hull_marker_array_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("~/planes_hull",10);
-        pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("~/pose",10);
-        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",10);
-        stair_det_fused_pub_ = this->create_publisher<zion_msgs::msg::StairDetStamped>("~/stair_fused",10);
+            options2);
+
+        rclcpp::QoS qos_profile_hull(10);
+        qos_profile_hull.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        hull_marker_array_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("~/planes_hull",qos_profile_hull);
+
+        rclcpp::QoS qos_profile_pose(10);
+        qos_profile_pose.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("~/pose",qos_profile_pose);
+
+        rclcpp::QoS qos_profile_stair(10);
+        qos_profile_stair.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",qos_profile_stair);
+
+        rclcpp::QoS qos_profile_stair_fused(10);
+        qos_profile_stair_fused.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        stair_det_fused_pub_ = this->create_publisher<zion_msgs::msg::StairDetStamped>("~/stair_fused",qos_profile_stair_fused);
         
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -425,8 +437,8 @@ namespace zion
         double roll ; double pitch ; double yaw;
         tf_rotation.getEulerYPR(yaw,pitch,roll);
         tf2::Quaternion q_rotation;
-        q_rotation.setRPY(0.,0.,pitch+(M_PI/2)); // pitch
-        // q_rotation.setRPY(0.,0.,0); // pitch
+        if(pitch>=0){q_rotation.setRPY(0.,0.,pitch - M_PI/2);}
+        else{q_rotation.setRPY(0.,0.,pitch + M_PI/2);}
         q_rotation.normalize();
 
         stair_pose_->orientation = tf2::toMsg(q_rotation);
