@@ -63,7 +63,7 @@ namespace zion
         rclcpp::QoS qos_profile_stair_fused(10);
         qos_profile_stair_fused.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         stair_det_fused_pub_ = this->create_publisher<zion_msgs::msg::StairDetStamped>("~/stair_fused",qos_profile_stair_fused);
-        
+
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
