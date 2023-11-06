@@ -81,8 +81,8 @@ void Plane::getMeasurements()
     pcl::PointXYZRGB min_pt, max_pt;
     pcl::getMinMax3D(cPoints, min_pt, max_pt);
 
-    length_ = max_pt.y - min_pt.y; // Third component, since main_dir has larger eigenvalue in third column
-    width_ = max_pt.z - min_pt.z;
+    length_ = max_pt.z - min_pt.z; // Third component, since main_dir has larger eigenvalue in third column
+    width_ = max_pt.y - min_pt.y;
 
     // Compute the center (of the bounding rectangle) and transform it back to world reference
     Eigen::Affine3d p2cp = Eigen::Translation3d(centroid_.getVector3fMap().cast<double>()) * Eigen::AngleAxisd(plane_dir_.cast<double>());
