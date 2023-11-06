@@ -185,7 +185,7 @@ namespace zion
             plane_segmenter.setDistanceThreshold(distance_threshold_);
             plane_segmenter.setEpsAngle(Utilities::deg2rad(angle_threshold_));
 
-            while ((outlier_points->points.size() > 0.15 * n_points) && i<2) {
+            while ((outlier_points->points.size() > 0.2 * n_points) && i<2) {
                 i++;
                 debug_msg_ = debug_msg_ + "\nRansac iteration: " + std::to_string(i);
 
@@ -371,7 +371,11 @@ namespace zion
     {   
         // check there is more then 1 plane
         // and the level length is more then the min
-        if(Planes_.size()>1 && Planes_[level_index_].length_>=k_length_min){
+        // if(Planes_.size()>1 && Planes_[level_index_].length_>=k_length_min){
+            if(Planes_.size()>1 
+            && Stair_.step_length_>=k_length_min 
+            && Stair_.step_height_>=k_height_min 
+            && Stair_.step_height_<=k_height_max){
             stair_detected_ = true;
         }
     }
@@ -380,10 +384,10 @@ namespace zion
     {
         // init stair
         Stair_ = Stair(Planes_);  
-        Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
-        Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
-        Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
-        Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
+        // Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
+        // Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
+        // Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
+        // Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
 
 
         float floor_h = Stair_.Planes_[floor_index_].plane_coefficients_->values[3];
@@ -393,20 +397,31 @@ namespace zion
         // if floor height is high than the level height (farther from the camera) -> stair ascending
         if (floor_h>level_h){
             Stair_.type_ = 0; // 0 = stair is upward
-            debug_msg_ = debug_msg_ + "\nStair type: Up";
+            Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
+            Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
+            Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
+            Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
             Stair_.transition_point_.x = Stair_.Planes_[level_index_].center_.x - (Stair_.step_length_/2);
+
+            debug_msg_ = debug_msg_ + "\nStair type: Up";
             // If upwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the level plane's cloud
             Stair_.step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, true);
         }else{ // -> stair descending
             Stair_.type_ = 1; // 1 = downwards
-            debug_msg_ = debug_msg_ + "\nStair type: Down";
+            Stair_.step_length_ = Stair_.Planes_[floor_index_].length_;
+            Stair_.step_width_ = Stair_.Planes_[floor_index_].width_;
+            Stair_.transition_point_.y = Stair_.Planes_[floor_index_].center_.y;
+            Stair_.transition_point_.z = Stair_.Planes_[floor_index_].center_.z;
             Stair_.transition_point_.x = Stair_.Planes_[floor_index_].center_.x + (Stair_.step_length_/2);
+
+            debug_msg_ = debug_msg_ + "\nStair type: Down";
             // compute distance
             // If downwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the second plane's cloud
-            Stair_.step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, false);
+            Stair_.step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[floor_index_].cloud_, y_threshold_, x_neighbors_, false);
         }
+        // Stair_.transition_point_.x = Stair_.step_distance_;
         // compute height
         Stair_.step_height_ = fabs(floor_h-level_h);
         // compute angle
@@ -660,12 +675,14 @@ namespace zion
 
                 if(!planes_empty_){
                     // find the floor plane
+                    
                     findFloor();
+                    if(Planes_.size()>1){getStair();}
                     checkForValidStair();
 
                     // if stair detected set the stair instance and compute geometric parameters
                     if(stair_detected_){
-                        getStair();
+                        // getStair();
                         // setStairTf();
                         getStairPose();
                                     // Publish the processed point cloud and custom msgs
@@ -688,11 +705,12 @@ namespace zion
                     if(!planes_empty_){
                         // find the floor plane
                         findFloor();
+                        if(Planes_.size()>1){getStair();}
                         checkForValidStair();
 
                         // if stair detected set the stair instance and compute geometric parameters
                         if(stair_detected_){
-                            getStair();
+                            // getStair();
                             // setStairTf();
                             getStairPose();
                             // Publish the processed point cloud and custom msgs
