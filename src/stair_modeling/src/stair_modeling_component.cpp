@@ -401,7 +401,7 @@ namespace zion
             Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
             Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
             Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
-            Stair_.transition_point_.x = Stair_.Planes_[level_index_].center_.x - (Stair_.step_length_/2);
+            // Stair_.transition_point_.x = Stair_.Planes_[level_index_].center_.x - (Stair_.step_length_/2);
 
             debug_msg_ = debug_msg_ + "\nStair type: Up";
             // If upwards, calculate the distance by finding the average x-coordinate
@@ -413,7 +413,7 @@ namespace zion
             Stair_.step_width_ = Stair_.Planes_[floor_index_].width_;
             Stair_.transition_point_.y = Stair_.Planes_[floor_index_].center_.y;
             Stair_.transition_point_.z = Stair_.Planes_[floor_index_].center_.z;
-            Stair_.transition_point_.x = Stair_.Planes_[floor_index_].center_.x + (Stair_.step_length_/2);
+            // Stair_.transition_point_.x = Stair_.Planes_[floor_index_].center_.x + (Stair_.step_length_/2);
 
             debug_msg_ = debug_msg_ + "\nStair type: Down";
             // compute distance
@@ -421,7 +421,7 @@ namespace zion
             // of the points below yThreshold in the second plane's cloud
             Stair_.step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[floor_index_].cloud_, y_threshold_, x_neighbors_, false);
         }
-        // Stair_.transition_point_.x = Stair_.step_distance_;
+        Stair_.transition_point_.x = Stair_.step_distance_;
         // compute height
         Stair_.step_height_ = fabs(floor_h-level_h);
         // compute angle
