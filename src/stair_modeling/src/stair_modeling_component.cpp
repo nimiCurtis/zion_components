@@ -1,6 +1,7 @@
 // Custom includes
 #include "stair_modeling_component.hpp"
 
+
 namespace zion
 {
     StairModeling::StairModeling(const rclcpp::NodeOptions &options)
@@ -23,15 +24,13 @@ namespace zion
         // Subscribers and Publishers
 
         // Callback Groups
-        rclcpp::SubscriptionOptions options1;
-        rclcpp::CallbackGroup::SharedPtr cbg1 = 
+        rclcpp::SubscriptionOptions pcl_sub_options;
+        rclcpp::CallbackGroup::SharedPtr pcl_sub_cbg = 
             this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive); 
-        options1.callback_group = cbg1;
+        pcl_sub_options.callback_group = pcl_sub_cbg;
 
-        rclcpp::SubscriptionOptions options2;
-        rclcpp::CallbackGroup::SharedPtr cbg2 = 
+        rclcpp::CallbackGroup::SharedPtr server_cbg = 
             this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);        
-        options2.callback_group = cbg2;
 
         // Pcl sub
         rclcpp::QoS qos_profile_pcl(10);
@@ -39,7 +38,7 @@ namespace zion
         // qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(input_point_cloud_topic_,qos_profile_pcl,
             std::bind(&StairModeling::pclCallback, this, std::placeholders::_1),
-            options1);
+            pcl_sub_options);
 
         rclcpp::QoS qos_profile_hull(10);
         qos_profile_hull.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
@@ -57,6 +56,15 @@ namespace zion
         qos_profile_pcl_pub.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         pcl_pub_= this->create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_filtered",qos_profile_pcl_pub);
         pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
+
+        // Services
+        stair_service_ = this->create_service<zion_msgs::srv::GetStair>(
+                "~/get_stair",
+                std::bind(&StairModeling::get_stair_service_callback, this,
+                     std::placeholders::_1, std::placeholders::_2),
+                rmw_qos_profile_services_default,
+                pcl_sub_cbg
+        );
 
 
         // init tf instances
@@ -700,10 +708,33 @@ namespace zion
                 printDebug();
             }
         }
-
     }
 
+
+    void StairModeling::get_stair_service_callback(
+                const std::shared_ptr<zion_msgs::srv::GetStair::Request> request,
+                const std::shared_ptr<zion_msgs::srv::GetStair::Response> response)
+    {
+        (void)request;
+        (void)response;
+        RCLCPP_INFO(this->get_logger(), "Received request, responding...");
+        std::cout<<"here";
+    }
+
+
+
+
+
+
+
 } // namespace
+
+
+
+
+
+
+
 
 #include "rclcpp_components/register_node_macro.hpp"
 

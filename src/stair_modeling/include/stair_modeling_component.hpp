@@ -10,7 +10,9 @@ using namespace std::chrono_literals;
 #include <string>
 #include <math.h>
 #include <iostream>
-
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
 // Third party libraries includes
 #include <vector>
 #include <pcl_conversions/pcl_conversions.h>
@@ -58,6 +60,7 @@ using namespace std::chrono_literals;
 #include <zion_msgs/msg/stair.hpp>
 #include <zion_msgs/msg/stair_stamped.hpp>
 #include <zion_msgs/msg/stair_det_stamped.hpp>
+#include <zion_msgs/srv/get_stair.hpp>
 
 namespace zion
 {
@@ -88,13 +91,6 @@ namespace zion
         void pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg);
 
         /**
-         * @brief Callback function for processing received detection_msg.
-         * @param det_msg Detection2D message received from a subscribed topic.
-         */
-        void detCallback(const vision_msgs::msg::Detection2D::SharedPtr pcl_msg);
-
-
-        /**
          * @brief Publishes the convex hulls of detected planes as a MarkerArray.
          * @param cloud_frame The frame ID of the point cloud.
          */
@@ -114,11 +110,9 @@ namespace zion
          */
         void publishStair(const std::string& cloud_frame);
 
-        /**
-         * @brief Publishes the the StairDet msgs.
-         * @param cloud_frame The frame ID of the point cloud.
-         */
-        void publishStairWithDet(const std::string& cloud_frame);
+        void get_stair_service_callback(
+            const std::shared_ptr<zion_msgs::srv::GetStair::Request> request,
+            const std::shared_ptr<zion_msgs::srv::GetStair::Response> response);
 
         /**
          * @brief Loads parameters from the parameter server.
@@ -188,6 +182,7 @@ namespace zion
     private:
         std::vector<double> colors_; ///< Vector storing colors for visualization.
 
+        // Subscribers
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_sub_; ///< Subscription to the point cloud topic.
         rclcpp::Subscription<vision_msgs::msg::Detection2D>::SharedPtr obj_det_sub_; ///< Subscription to the detection topic.
 
@@ -197,6 +192,9 @@ namespace zion
         rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_pub_;
         geometry_msgs::msg::Pose::SharedPtr stair_pose_; ///< Pose of the detected stair.
+
+        // Services
+        rclcpp::Service<zion_msgs::srv::GetStair>::SharedPtr stair_service_;
 
         // tf2_ros
         std::unique_ptr<tf2_ros::Buffer> tf_buffer_; ///< Buffer to store transforms for the tf2 listener.
