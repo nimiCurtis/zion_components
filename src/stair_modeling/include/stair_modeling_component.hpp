@@ -5,6 +5,7 @@
 #include <sys/resource.h>
 #include <memory>
 #include <chrono>
+using namespace std::chrono_literals;
 #include <functional>
 #include <string>
 #include <math.h>
@@ -194,7 +195,7 @@ namespace zion
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr hull_marker_array_pub_; ///< Publisher to the hull topic.
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_; ///< Publisher to the stair pose topic.
         rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
-        rclcpp::Publisher<zion_msgs::msg::StairDetStamped>::SharedPtr stair_det_fused_pub_; ///< Publisher to the stair topic.
+        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_pub_;
         geometry_msgs::msg::Pose::SharedPtr stair_pose_; ///< Pose of the detected stair.
 
         // tf2_ros
@@ -207,12 +208,27 @@ namespace zion
         // PointCloud objects and flags
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;   ///< Input point cloud.
         std::shared_ptr<sensor_msgs::msg::PointCloud2> pcl_buffer_;  ///< Buffer for storing the processed point cloud.
-        std::shared_ptr<vision_msgs::msg::Detection2D> det_buffer_;
         bool stair_detected_; ///< Flag indicating whether a stair has been detected.
         int floor_index_; ///< Index of the detected floor plane.
         int level_index_; ///< Index of the detected level plane.
 
+        // Transformation matrix.
+        Eigen::Affine3d c2cp;
+
         // ROS parameters
+        // Parameters for voxel filtering
+        double leaf_size_xy_;
+        double leaf_size_z_;
+    
+        // Parameters defining the crop box's dimensions
+        double min_x_;
+        double max_x_;
+        double min_y_;
+        double max_y_;
+        double min_z_;
+        double max_z_;
+
+
         double distance_threshold_; ///< Distance threshold for the plane segmentation.
         int max_iterations_; ///< Maximum number of iterations for plane segmentation.
         double angle_threshold_; ///< Angle threshold for plane segmentation.
@@ -229,11 +245,10 @@ namespace zion
         std::string input_point_cloud_topic_; ///< Topic name for input point cloud.
         std::string filtered_point_cloud_topic_; ///< Topic name for filtered point cloud.
 
+        std::string input_frame_; ///< Name of the input frame for the processed data.
         std::string output_frame_; ///< Name of the output frame for the processed data.
 
-        bool use_det_; ///< Using the stair detection model for predictiong single stair.
         bool planes_empty_; ///< No planes are found. True == there is no planes found from segmentation.
-        bool det_found_; ///< Effective only if use_det is true. Detection found boolean. True == there is a detection. 
         bool debug_; ///< Flag for debugging mode.
         std::string debug_msg_; ///< Message string for debugging.
     };
