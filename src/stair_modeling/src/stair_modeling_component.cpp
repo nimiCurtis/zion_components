@@ -19,7 +19,6 @@ namespace zion
         // init pcl and det buffer
         cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
         stair_pose_.reset(new geometry_msgs::msg::Pose);
-        det_buffer_ = std::shared_ptr<vision_msgs::msg::Detection2D>();
 
         // Subscribers and Publishers
 
@@ -38,15 +37,9 @@ namespace zion
         rclcpp::QoS qos_profile_pcl(10);
         qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         // qos_profile_pcl.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-        pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(filtered_point_cloud_topic_,qos_profile_pcl,
+        pcl_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(input_point_cloud_topic_,qos_profile_pcl,
             std::bind(&StairModeling::pclCallback, this, std::placeholders::_1),
             options1);
-
-        rclcpp::QoS qos_profile_det(10);
-        qos_profile_det.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-        obj_det_sub_  = this->create_subscription<vision_msgs::msg::Detection2D>("/zion/stair_detection/detection",qos_profile_det,
-            std::bind(&StairModeling::detCallback, this, std::placeholders::_1),
-            options2);
 
         rclcpp::QoS qos_profile_hull(10);
         qos_profile_hull.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
@@ -60,9 +53,11 @@ namespace zion
         qos_profile_stair.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",qos_profile_stair);
 
-        rclcpp::QoS qos_profile_stair_fused(10);
-        qos_profile_stair_fused.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-        stair_det_fused_pub_ = this->create_publisher<zion_msgs::msg::StairDetStamped>("~/stair_fused",qos_profile_stair_fused);
+        rclcpp::QoS qos_profile_pcl_pub(10);
+        qos_profile_pcl_pub.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        pcl_pub_= this->create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_filtered",qos_profile_pcl_pub);
+        pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
+
 
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -73,7 +68,6 @@ namespace zion
         floor_index_ = -1;  
         level_index_ = -1;
 
-        det_found_ = false;
         planes_empty_ = true;
 
         colors_={
@@ -99,10 +93,6 @@ namespace zion
         RCLCPP_INFO(get_logger(),"* debug: %s", debug_ ? "true" : "false");
 
         // Debug
-        this->declare_parameter("use_det", false);
-        this->get_parameter("use_det", use_det_);
-        RCLCPP_INFO(get_logger(),"* use_det: %s", use_det_ ? "true" : "false");
-
         // Segmentation Parameters
         this->declare_parameter("segmentation.distance_threshold", 0.05);
         this->get_parameter("segmentation.distance_threshold", distance_threshold_);
@@ -140,14 +130,53 @@ namespace zion
         RCLCPP_INFO(get_logger(),"* avg_x_calculation.y_threshold: %f", y_threshold_);
 
         // Topic Names
-        this->declare_parameter("topic_names.filtered_point_cloud_topic", "/stair_modeling_ros/point_cloud/cloud_filtered");
-        this->get_parameter("topic_names.filtered_point_cloud_topic", filtered_point_cloud_topic_);
-        RCLCPP_INFO(get_logger(),"* filtered_point_cloud_topic: %s", filtered_point_cloud_topic_.c_str());
+        this->declare_parameter("topic_names.input_point_cloud_topic", "/zedm/zed_node/point_cloud/cloud_registered");
+        this->get_parameter("topic_names.input_point_cloud_topic", input_point_cloud_topic_);
+        RCLCPP_INFO(get_logger(),"* input_point_cloud_topic: %s", input_point_cloud_topic_.c_str());
 
         // Frame IDs
+        this->declare_parameter("frame_ids.input_cloud_frame", "zedm_left_camera_frame");
+        this->get_parameter("frame_ids.input_cloud_frame", input_frame_);
+        RCLCPP_INFO(get_logger(),"* input_cloud_frame: '%s'", input_frame_.c_str());
+
         this->declare_parameter("frame_ids.output_cloud_frame", "zedm_base_link_projected");
         this->get_parameter("frame_ids.output_cloud_frame", output_frame_);
         RCLCPP_INFO(get_logger(),"* output_cloud_frame: '%s'", output_frame_.c_str());
+
+        // Voxel Filter Parameters
+        this->declare_parameter("voxel_filter.leaf_size_xy", 0.025);
+        this->get_parameter("voxel_filter.leaf_size_xy", leaf_size_xy_);
+        RCLCPP_INFO(get_logger(),"* leaf_size_xy: %f", leaf_size_xy_);
+
+        this->declare_parameter("voxel_filter.leaf_size_z", 0.08);
+        this->get_parameter("voxel_filter.leaf_size_z", leaf_size_z_);
+        RCLCPP_INFO(get_logger(),"* leaf_size_z: %f", leaf_size_z_);
+
+        // Crop Box Parameters
+        this->declare_parameter("crop_box.min_x", 0.0);
+        this->get_parameter("crop_box.min_x", min_x_);
+        RCLCPP_INFO(get_logger(),"* min_x: %f", min_x_);
+
+        this->declare_parameter("crop_box.max_x", 2.0);
+        this->get_parameter("crop_box.max_x", max_x_);
+        RCLCPP_INFO(get_logger(),"* max_x: %f", max_x_);
+
+        this->declare_parameter("crop_box.min_y", -0.8);
+        this->get_parameter("crop_box.min_y", min_y_);
+        RCLCPP_INFO(get_logger(),"* min_y: %f", min_y_);
+
+        this->declare_parameter("crop_box.max_y", 0.8);
+        this->get_parameter("crop_box.max_y", max_y_);
+        RCLCPP_INFO(get_logger(),"* max_y: %f", max_y_);
+
+        this->declare_parameter("crop_box.min_z", -3.0);
+        this->get_parameter("crop_box.min_z", min_z_);
+        RCLCPP_INFO(get_logger(),"* min_z: %f", min_z_);
+
+        this->declare_parameter("crop_box.max_z", 1.0);
+        this->get_parameter("crop_box.max_z", max_z_);
+        RCLCPP_INFO(get_logger(),"* max_z: %f", max_z_);
+
     }
 
 
@@ -295,7 +324,6 @@ namespace zion
             if (Planes_.size()>1){
 
                 // If not using stair detection -> find the floor based on the x's values
-                if (!use_det_){
                     float min_avg_x = std::numeric_limits<float>::max();
 
                     // Loop through each plane
@@ -324,34 +352,6 @@ namespace zion
                     }
                     if (floor_index_==0){ level_index_ = 1;}
                     else{ level_index_ = 0;}
-                }
-                // Else find the floor based on the stair detection result
-                else{
-                    float min_height = std::numeric_limits<float>::max();
-                    int min_index = -1;
-                    // Loop through each plane
-                    // And find the index of the lowest plane
-                    for (size_t i = 0; i < Planes_.size(); ++i) {
-                        const auto& plane = Planes_[i];
-                        if (plane.plane_coefficients_->values[3]<min_height){
-                        min_index=i;
-                        min_height = plane.plane_coefficients_->values[3];
-                        }
-                    }
-                    std::string stair_id = det_buffer_->results.begin()->id;
-                    // If stair ascending -> the lowest plane is the floor
-                    if(stair_id=="SSA"){
-                        floor_index_ = min_index;
-                        if (floor_index_==0){ level_index_ = 1;}
-                        else{level_index_ = 0;}
-                    }
-                    // If stair descending -> the lowest plane is the level
-                    else{
-                        level_index_ = min_index;
-                        if (level_index_==0){ floor_index_ = 1;}
-                        else{floor_index_ = 0;}
-                    }
-                }
             }
             // In case of single plane -> It is the floor!
             else{
@@ -373,7 +373,7 @@ namespace zion
         // and the level length is more then the min
         // if(Planes_.size()>1 && Planes_[level_index_].length_>=k_length_min){
             if(Planes_.size()>1 
-            && Stair_.step_length_>=k_length_min 
+            // && Stair_.step_length_>=k_length_min --> change to volume
             && Stair_.step_height_>=k_height_min 
             && Stair_.step_height_<=k_height_max){
             stair_detected_ = true;
@@ -384,12 +384,6 @@ namespace zion
     {
         // init stair
         Stair_ = Stair(Planes_);  
-        // Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
-        // Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
-        // Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
-        // Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
-
-
         float floor_h = Stair_.Planes_[floor_index_].plane_coefficients_->values[3];
         float level_h = Stair_.Planes_[level_index_].plane_coefficients_->values[3];
         
@@ -401,25 +395,37 @@ namespace zion
             Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
             Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
             Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
+<<<<<<< HEAD
             // Stair_.transition_point_.x = Stair_.Planes_[level_index_].center_.x - (Stair_.step_length_/2);
 
             debug_msg_ = debug_msg_ + "\nStair type: Up";
+=======
+>>>>>>> dev-single_component
             // If upwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the level plane's cloud
-            Stair_.step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, true);
+            float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, true);
+            Stair_.transition_point_.x = x_distance;
+            debug_msg_ = debug_msg_ + "\nStair type: Up";
+            Stair_.step_distance_ = x_distance;
+
         }else{ // -> stair descending
             Stair_.type_ = 1; // 1 = downwards
             Stair_.step_length_ = Stair_.Planes_[floor_index_].length_;
             Stair_.step_width_ = Stair_.Planes_[floor_index_].width_;
             Stair_.transition_point_.y = Stair_.Planes_[floor_index_].center_.y;
             Stair_.transition_point_.z = Stair_.Planes_[floor_index_].center_.z;
+<<<<<<< HEAD
             // Stair_.transition_point_.x = Stair_.Planes_[floor_index_].center_.x + (Stair_.step_length_/2);
+=======
+>>>>>>> dev-single_component
 
-            debug_msg_ = debug_msg_ + "\nStair type: Down";
             // compute distance
             // If downwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the second plane's cloud
-            Stair_.step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[floor_index_].cloud_, y_threshold_, x_neighbors_, false);
+            float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[floor_index_].cloud_, y_threshold_, x_neighbors_, false);
+            Stair_.transition_point_.x = x_distance;
+            debug_msg_ = debug_msg_ + "\nStair type: Down";
+            Stair_.step_distance_ = x_distance;
         }
         Stair_.transition_point_.x = Stair_.step_distance_;
         // compute height
@@ -526,29 +532,6 @@ namespace zion
         stair_pub_->publish(stair_stamped_msg);
     }
 
-        void StairModeling::publishStairWithDet(const std::string& cloud_frame)
-    {   
-        
-        zion_msgs::msg::StairDetStamped stair_det_stamped_msg; //with or without ::msg ?
-        
-        // declare stair_stamped_msg
-        stair_det_stamped_msg.header.frame_id = cloud_frame;
-        stair_det_stamped_msg.header.stamp = this->get_clock()->now();
-
-        // declare stair_msg
-
-        stair_det_stamped_msg.stair.id = Stair_.type_;
-        stair_det_stamped_msg.stair.distance = Stair_.step_distance_;
-        stair_det_stamped_msg.stair.height = Stair_.step_height_;
-        stair_det_stamped_msg.stair.angle = Stair_.step_angle_;
-        stair_det_stamped_msg.stair.length = Stair_.step_length_;
-        stair_det_stamped_msg.stair.width = Stair_.step_width_;
-        stair_det_stamped_msg.stair.pose = *stair_pose_;
-
-        stair_det_stamped_msg.bbox = det_buffer_->bbox;
-
-        stair_det_fused_pub_->publish(stair_det_stamped_msg);
-    }
 
     void StairModeling::publishHullsAsMarkerArray(const std::string& cloud_frame)
     {
@@ -646,31 +629,55 @@ namespace zion
         pose_pub_->publish(pose_stamped);
     }
 
-    void StairModeling::detCallback(const vision_msgs::msg::Detection2D::SharedPtr det_msg)
-    {
-        det_buffer_ = det_msg;
-        // RCLCPP_INFO(get_logger(),"Got detection msg!");
-        if (det_buffer_->results.size() == 0){
-            debug_msg_ = debug_msg_ + "\nDetection empty" ;
-            det_found_ = false;
-        }
-        else{
-            debug_msg_ = debug_msg_ + "\nDetection is: " +  det_buffer_->results.begin()->id.c_str();
-            det_found_ = true;
-        }
-    }
 
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
     {
-            reset();
+        RCLCPP_DEBUG(get_logger(),"Pcl msg recieved!");
 
-            // from ros msg 
-            pcl::fromROSMsg(*pcl_msg, *cloud_);
+        reset();
 
-            // RCLCPP_INFO(get_logger(),"Got pcl msg!");
+        geometry_msgs::msg::TransformStamped base_projected2camera;
 
-            if (!use_det_){
+        // Check if transformation between frames is available
+        if (tf_buffer_->canTransform(output_frame_, input_frame_, tf2::TimePointZero))
+        {
+            try {
+                // Lookup for the transformation
+                base_projected2camera = tf_buffer_->lookupTransform(
+                    output_frame_, input_frame_,
+                    tf2::TimePointZero,
+                    50ms);
+
+                // Convert ROS transform to Eigen transform
+                c2cp = tf2::transformToEigen(base_projected2camera);
+
+                // Initialize point clouds
+                pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
+                // pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
+
+                // Convert ROS point cloud message to PCL point cloud
+                pcl::fromROSMsg(*pcl_msg, *input_cloud);
+
+                // Process the input cloud
+                Utilities::voxelizingDownsample(input_cloud, input_cloud,
+                                                leaf_size_xy_,leaf_size_z_);
+
+
+                Utilities::transformCloud(c2cp,input_cloud,input_cloud);
+
+                Utilities::cropping(input_cloud, cloud_,
+                                min_x_,max_x_,
+                                min_y_,max_y_,
+                                min_z_,max_z_);
+
+                // Convert processed PCL point cloud to ROS message
+                pcl::toROSMsg(*cloud_, *pcl_buffer_);
+                pcl_buffer_->header.stamp = this->get_clock()->now();
+                pcl_buffer_->header.frame_id = output_frame_;
+                pcl_pub_->publish(*pcl_buffer_);
+
                 // RANSAC-based plane segmentation
+                // cloud_ = output_cloud;
                 getPlanes(cloud_);
 
                 if(!planes_empty_){
@@ -685,55 +692,26 @@ namespace zion
                         // getStair();
                         // setStairTf();
                         getStairPose();
-                                    // Publish the processed point cloud and custom msgs
+                        // Publish the processed point cloud and custom msgs
                         publishHullsAsMarkerArray(output_frame_);
                         publishStairPose(output_frame_);
                         publishStair(output_frame_);
-
                     }
                 }
             }
-            else{
-                // RCLCPP_INFO(get_logger(), "Detection found = %s", det_found_ ? "true" : "false");
-                if (det_found_){
-                    debug_msg_ = debug_msg_ + "\nUsing Stair detection Node -> Detection found";   
-
-                    // RANSAC-based plane segmentation
-                    getPlanes(cloud_);
-                                // debug msg
-
-                    if(!planes_empty_){
-                        // find the floor plane
-                        findFloor();
-                        if(Planes_.size()>1){getStair();}
-                        checkForValidStair();
-
-                        // if stair detected set the stair instance and compute geometric parameters
-                        if(stair_detected_){
-                            // getStair();
-                            // setStairTf();
-                            getStairPose();
-                            // Publish the processed point cloud and custom msgs
-                            publishHullsAsMarkerArray(output_frame_);
-                            publishStairPose(output_frame_);
-                            publishStairWithDet(output_frame_);
-                        }
-                    }
-                }
-                else{
-                    debug_msg_ = debug_msg_ + "\nUsing Stair detection Node -> No detection found yet";
-                }   
+            catch (const tf2::TransformException & ex) {
+                RCLCPP_INFO(
+                this->get_logger(), "Could not transform %s to %s: %s",
+                input_frame_.c_str(), output_frame_.c_str(), ex.what());
+                return;
             }
-
-            det_found_ = false;
-
             // debug msg
             if(debug_){
                 printDebug();
             }
+        }
+
     }
-
-
 
 } // namespace
 

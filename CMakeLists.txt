@@ -77,8 +77,6 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_SOURCE_DIR}/src/include
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/include
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include
 )
 
@@ -91,31 +89,10 @@ add_definitions(${PCL_DEFINITIONS})
 
 ### need to check carefully about unrelevant sources
 
-set(CLOUD_PROCESSOR_INC
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/include/visibility_control.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/include/utilities.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/include/cloud_processor_component.hpp
-)
-
-set(CLOUD_PROCESSOR_SRC
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/src/utilities.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/src/cloud_processor_component.cpp
-)
-
-set(BROADCASTER_INC
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/include/visibility_control.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/include/zion_broadcaster_component.hpp
-)
-
-set(BROADCASTER_SRC
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/src/zion_broadcaster_component.cpp
-)
 
 set(STAIR_MODELING_INC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/include/visibility_control.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/include/utilities.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/include/cloud_processor_component.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/include/zion_broadcaster_component.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include/plane.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include/stair.h
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include/stair_modeling_component.hpp
@@ -134,26 +111,6 @@ set(STAIR_MODELING_SRC
 # create ament index resource which references the libraries in the binary dir
 set(node_plugins "")
 
-add_library(cloud_processor_component SHARED
-    ${CLOUD_PROCESSOR_INC}
-    ${CLOUD_PROCESSOR_SRC})
-target_compile_definitions(cloud_processor_component
-  PRIVATE "COMPOSITION_BUILDING_DLL")
-ament_target_dependencies(cloud_processor_component
-    ${DEPENDENCIES})
-rclcpp_components_register_nodes(cloud_processor_component "zion::CloudProcessor")
-set(node_plugins "${node_plugins}zion::CloudProcessor;$<TARGET_FILE:cloud_processor_component>\n")
-
-add_library(zion_broadcaster_component SHARED
-    ${BROADCASTER_INC}
-    ${BROADCASTER_SRC})
-target_compile_definitions(zion_broadcaster_component
-  PRIVATE "COMPOSITION_BUILDING_DLL")
-ament_target_dependencies(zion_broadcaster_component
-    ${DEPENDENCIES})
-rclcpp_components_register_nodes(zion_broadcaster_component "zion::ZionBroadcaster")
-set(node_plugins "${node_plugins}zion::ZionBroadcaster;$<TARGET_FILE:zion_broadcaster_component>\n")
-
 add_library(stair_modeling_component SHARED
     ${STAIR_MODELING_INC}
     ${STAIR_MODELING_SRC})
@@ -170,8 +127,6 @@ set(node_plugins "${node_plugins}zion::StairModeling;$<TARGET_FILE:stair_modelin
 # Mark executables and/or libraries for installation
 
 install(TARGETS
-  cloud_processor_component
-  zion_broadcaster_component
   stair_modeling_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -181,17 +136,13 @@ install(TARGETS
 # Mark cpp header files for installation
 install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/src/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/broadcaster/include/
   ${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/include/
   ${CMAKE_CURRENT_SOURCE_DIR}/src/stair_modeling/include/
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cloud_processor/include/
   DESTINATION include/${PROJECT_NAME}/
 )
 
 ament_export_include_directories(include)
 ament_export_libraries(
-                      cloud_processor_component
-                      zion_broadcaster_component
                       stair_modeling_component
                       )
 ament_export_dependencies(${DEPENDENCIES})
