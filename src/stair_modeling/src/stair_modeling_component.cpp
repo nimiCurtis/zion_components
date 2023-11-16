@@ -622,7 +622,7 @@ namespace zion
 
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
     {
-        RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
+        RCLCPP_DEBUG(get_logger(),"Pcl msg recieved!");
 
         reset();
 
