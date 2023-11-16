@@ -717,8 +717,13 @@ namespace zion
     {
         (void)request;
         (void)response;
+
         RCLCPP_INFO(this->get_logger(), "Received request, responding...");
-        std::cout<<"here";
+        RCLCPP_INFO(this->get_logger(), "Class id: %s",
+                request->id.c_str());
+        
+        response->success = true;
+        // return response;
     }
 
 
