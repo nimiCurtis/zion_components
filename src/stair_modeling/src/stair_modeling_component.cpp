@@ -395,12 +395,6 @@ namespace zion
             Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
             Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
             Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
-<<<<<<< HEAD
-            // Stair_.transition_point_.x = Stair_.Planes_[level_index_].center_.x - (Stair_.step_length_/2);
-
-            debug_msg_ = debug_msg_ + "\nStair type: Up";
-=======
->>>>>>> dev-single_component
             // If upwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the level plane's cloud
             float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, true);
@@ -414,10 +408,6 @@ namespace zion
             Stair_.step_width_ = Stair_.Planes_[floor_index_].width_;
             Stair_.transition_point_.y = Stair_.Planes_[floor_index_].center_.y;
             Stair_.transition_point_.z = Stair_.Planes_[floor_index_].center_.z;
-<<<<<<< HEAD
-            // Stair_.transition_point_.x = Stair_.Planes_[floor_index_].center_.x + (Stair_.step_length_/2);
-=======
->>>>>>> dev-single_component
 
             // compute distance
             // If downwards, calculate the distance by finding the average x-coordinate
