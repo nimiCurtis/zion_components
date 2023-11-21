@@ -224,7 +224,7 @@ namespace zion
             plane_segmenter.setDistanceThreshold(distance_threshold_);
             plane_segmenter.setEpsAngle(Utilities::deg2rad(angle_threshold_));
 
-            while ((outlier_points->points.size() > 0.2 * n_points) && i<2) {
+            while ((outlier_points->points.size() > 0.15 * n_points) && i<2) {
                 i++;
                 debug_msg_ = debug_msg_ + "\nRansac iteration: " + std::to_string(i);
 
@@ -312,8 +312,7 @@ namespace zion
                                             +"z: " + std::to_string(Planes_[i].center_.z);
                                 
                                 debug_msg_ = debug_msg_ + 
-                                "\nwidth: " + std::to_string(Planes_[i].width_) + " | "
-                                +"length: " + std::to_string(Planes_[i].length_);
+                                "\narea: " + std::to_string(Planes_[i].width_ * Planes_[i].length_);
                                 
                                 debug_msg_ = debug_msg_ + "\n-----";
                 }
