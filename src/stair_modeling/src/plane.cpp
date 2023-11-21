@@ -1,4 +1,4 @@
-// Copyright 2022 Nimrod Curtis
+// Copyright 2023 Nimrod Curtis
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -106,3 +106,4 @@ void Plane::getMeasurements()
     center_.y = mean_diag(1);
     center_.z = mean_diag(2);
 }
+
