@@ -1,3 +1,17 @@
+// Copyright 2022 Nimrod Curtis
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef STAIR_MODELING_HPP
 #define STAIR_MODELING_HPP
 
@@ -88,13 +102,6 @@ namespace zion
         void pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg);
 
         /**
-         * @brief Callback function for processing received detection_msg.
-         * @param det_msg Detection2D message received from a subscribed topic.
-         */
-        void detCallback(const vision_msgs::msg::Detection2D::SharedPtr pcl_msg);
-
-
-        /**
          * @brief Publishes the convex hulls of detected planes as a MarkerArray.
          * @param cloud_frame The frame ID of the point cloud.
          */
@@ -113,12 +120,6 @@ namespace zion
          * @param cloud_frame The frame ID of the point cloud.
          */
         void publishStair(const std::string& cloud_frame);
-
-        /**
-         * @brief Publishes the the StairDet msgs.
-         * @param cloud_frame The frame ID of the point cloud.
-         */
-        void publishStairWithDet(const std::string& cloud_frame);
 
         /**
          * @brief Loads parameters from the parameter server.
@@ -188,8 +189,8 @@ namespace zion
     private:
         std::vector<double> colors_; ///< Vector storing colors for visualization.
 
+        // Subscribers
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_sub_; ///< Subscription to the point cloud topic.
-        rclcpp::Subscription<vision_msgs::msg::Detection2D>::SharedPtr obj_det_sub_; ///< Subscription to the detection topic.
 
         // Publishers
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr hull_marker_array_pub_; ///< Publisher to the hull topic.
@@ -227,7 +228,6 @@ namespace zion
         double max_y_;
         double min_z_;
         double max_z_;
-
 
         double distance_threshold_; ///< Distance threshold for the plane segmentation.
         int max_iterations_; ///< Maximum number of iterations for plane segmentation.

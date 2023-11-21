@@ -1,3 +1,17 @@
+// Copyright 2022 Nimrod Curtis
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Custom includes
 #include "stair_modeling_component.hpp"
 
@@ -92,7 +106,20 @@ namespace zion
         this->get_parameter("debug", debug_);
         RCLCPP_INFO(get_logger(),"* debug: %s", debug_ ? "true" : "false");
 
-        // Debug
+        // Topic Names
+        this->declare_parameter("topic_names.input_point_cloud_topic", "/zedm/zed_node/point_cloud/cloud_registered");
+        this->get_parameter("topic_names.input_point_cloud_topic", input_point_cloud_topic_);
+        RCLCPP_INFO(get_logger(),"* input_point_cloud_topic: %s", input_point_cloud_topic_.c_str());
+
+        // Frame IDs
+        this->declare_parameter("frame_ids.input_cloud_frame", "zedm_left_camera_frame");
+        this->get_parameter("frame_ids.input_cloud_frame", input_frame_);
+        RCLCPP_INFO(get_logger(),"* input_cloud_frame: '%s'", input_frame_.c_str());
+
+        this->declare_parameter("frame_ids.output_cloud_frame", "zedm_base_link_projected");
+        this->get_parameter("frame_ids.output_cloud_frame", output_frame_);
+        RCLCPP_INFO(get_logger(),"* output_cloud_frame: '%s'", output_frame_.c_str());
+
         // Segmentation Parameters
         this->declare_parameter("segmentation.distance_threshold", 0.05);
         this->get_parameter("segmentation.distance_threshold", distance_threshold_);
@@ -129,20 +156,6 @@ namespace zion
         this->get_parameter("avg_x_calculation.y_threshold", y_threshold_);
         RCLCPP_INFO(get_logger(),"* avg_x_calculation.y_threshold: %f", y_threshold_);
 
-        // Topic Names
-        this->declare_parameter("topic_names.input_point_cloud_topic", "/zedm/zed_node/point_cloud/cloud_registered");
-        this->get_parameter("topic_names.input_point_cloud_topic", input_point_cloud_topic_);
-        RCLCPP_INFO(get_logger(),"* input_point_cloud_topic: %s", input_point_cloud_topic_.c_str());
-
-        // Frame IDs
-        this->declare_parameter("frame_ids.input_cloud_frame", "zedm_left_camera_frame");
-        this->get_parameter("frame_ids.input_cloud_frame", input_frame_);
-        RCLCPP_INFO(get_logger(),"* input_cloud_frame: '%s'", input_frame_.c_str());
-
-        this->declare_parameter("frame_ids.output_cloud_frame", "zedm_base_link_projected");
-        this->get_parameter("frame_ids.output_cloud_frame", output_frame_);
-        RCLCPP_INFO(get_logger(),"* output_cloud_frame: '%s'", output_frame_.c_str());
-
         // Voxel Filter Parameters
         this->declare_parameter("voxel_filter.leaf_size_xy", 0.025);
         this->get_parameter("voxel_filter.leaf_size_xy", leaf_size_xy_);
@@ -176,10 +189,7 @@ namespace zion
         this->declare_parameter("crop_box.max_z", 1.0);
         this->get_parameter("crop_box.max_z", max_z_);
         RCLCPP_INFO(get_logger(),"* max_z: %f", max_z_);
-
     }
-
-
 
     void StairModeling::printDebug()
     {
@@ -316,7 +326,6 @@ namespace zion
     }
 
 
-
     void StairModeling::findFloor() 
     {
 
@@ -358,7 +367,6 @@ namespace zion
                 floor_index_=0;
             }
         
-        
         // set planes type 
         if (floor_index_!=-1){Planes_[floor_index_].type_ = 0;}
         if (level_index_!=-1){Planes_[level_index_].type_ = 1;}
@@ -375,7 +383,8 @@ namespace zion
             if(Planes_.size()>1 
             // && Stair_.step_length_>=k_length_min --> change to volume
             && Stair_.step_height_>=k_height_min 
-            && Stair_.step_height_<=k_height_max){
+            && Stair_.step_height_<=k_height_max
+            && (Stair_.step_length_*Stair_.step_width_)>=k_area_min){
             stair_detected_ = true;
         }
     }
@@ -444,7 +453,6 @@ namespace zion
                         static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 2)),
                         static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 2)));
 
-        // tf_rotation.getRotation(tf_quaternion);
         double roll ; double pitch ; double yaw;
         tf_rotation.getEulerYPR(yaw,pitch,roll);
         tf2::Quaternion q_rotation;
@@ -652,7 +660,6 @@ namespace zion
                 Utilities::voxelizingDownsample(input_cloud, input_cloud,
                                                 leaf_size_xy_,leaf_size_z_);
 
-
                 Utilities::transformCloud(c2cp,input_cloud,input_cloud);
 
                 Utilities::cropping(input_cloud, cloud_,
@@ -700,9 +707,7 @@ namespace zion
                 printDebug();
             }
         }
-
     }
-
 } // namespace
 
 #include "rclcpp_components/register_node_macro.hpp"
