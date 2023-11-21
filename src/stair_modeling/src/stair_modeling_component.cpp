@@ -1,4 +1,4 @@
-// Copyright 2022 Nimrod Curtis
+// Copyright 2023 Nimrod Curtis
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -630,7 +630,7 @@ namespace zion
 
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
     {
-        RCLCPP_DEBUG(get_logger(),"Pcl msg recieved!");
+        // RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
 
         reset();
 
