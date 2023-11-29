@@ -67,14 +67,14 @@ namespace zion
         qos_profile_stair.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",qos_profile_stair);
 
-        rclcpp::QoS qos_profile_pcl_pub(10);
-        qos_profile_pcl_pub.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-        pcl_pub_= this->create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_filtered",qos_profile_pcl_pub);
-        pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
+        // rclcpp::QoS qos_profile_pcl_pub(10);
+        // qos_profile_pcl_pub.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        // pcl_pub_= this->create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_filtered",qos_profile_pcl_pub);
+        // pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
 
 
         // init tf instances
-        tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock(),tf2::durationFromSec(5.0));
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
 
@@ -707,6 +707,108 @@ namespace zion
             }
         }
     }
+
+
+    // void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
+    // {
+    //     // RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
+
+    //     reset();
+
+
+    //             // Convert ROS point cloud message to PCL point cloud
+    //             pcl::fromROSMsg(*pcl_msg, *cloud_);
+
+    //             // RANSAC-based plane segmentation
+    //             // cloud_ = output_cloud;
+    //             getPlanes(cloud_);
+
+    //             if(!planes_empty_){
+    //                 // find the floor plane
+                    
+    //                 findFloor();
+    //                 if(Planes_.size()>1){getStair();}
+    //                 checkForValidStair();
+
+    //                 // if stair detected set the stair instance and compute geometric parameters
+    //                 if(stair_detected_){
+    //                     // getStair();
+    //                     // setStairTf();
+    //                     getStairPose();
+    //                     // Publish the processed point cloud and custom msgs
+    //                     publishHullsAsMarkerArray(output_frame_);
+    //                     publishStairPose(output_frame_);
+    //                     publishStair(output_frame_);
+    //                 }
+    //             }
+
+    //         // debug msg
+    //         if(debug_){
+    //             printDebug();
+    //         }
+        
+    // }
+
+    //     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
+    // {
+    //     // RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
+
+    //     reset();
+
+    //     geometry_msgs::msg::TransformStamped base_projected2camera;
+
+    //     // Check if transformation between frames is available
+    //     if (tf_buffer_->canTransform(output_frame_, input_frame_, tf2::TimePointZero))
+    //     {
+    //         try {
+    //             // Lookup for the transformation
+    //             base_projected2camera = tf_buffer_->lookupTransform(
+    //                 output_frame_, input_frame_,
+    //                 tf2::TimePointZero,
+    //                 50ms);
+
+    //             // Convert ROS transform to Eigen transform
+    //             c2cp = tf2::transformToEigen(base_projected2camera);
+
+    //             // Initialize point clouds
+    //             pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
+    //             // pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
+
+    //             // Convert ROS point cloud message to PCL point cloud
+    //             pcl::fromROSMsg(*pcl_msg, *input_cloud);
+
+    //             // Process the input cloud
+    //             Utilities::voxelizingDownsample(input_cloud, input_cloud,
+    //                                             leaf_size_xy_,leaf_size_z_);
+
+    //             Utilities::transformCloud(c2cp,input_cloud,input_cloud);
+
+    //             Utilities::cropping(input_cloud, cloud_,
+    //                             min_x_,max_x_,
+    //                             min_y_,max_y_,
+    //                             min_z_,max_z_);
+
+    //             // Convert processed PCL point cloud to ROS message
+    //             pcl::toROSMsg(*cloud_, *pcl_buffer_);
+    //             pcl_buffer_->header.stamp = this->get_clock()->now();
+    //             pcl_buffer_->header.frame_id = output_frame_;
+    //             pcl_pub_->publish(*pcl_buffer_);
+
+                
+    //         }
+    //         catch (const tf2::TransformException & ex) {
+    //             RCLCPP_INFO(
+    //             this->get_logger(), "Could not transform %s to %s: %s",
+    //             input_frame_.c_str(), output_frame_.c_str(), ex.what());
+    //             return;
+    //         }
+    //         // debug msg
+    //         if(debug_){
+    //             printDebug();
+    //         }
+    //     }
+    // }
+
 } // namespace
 
 #include "rclcpp_components/register_node_macro.hpp"
