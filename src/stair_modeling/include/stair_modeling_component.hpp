@@ -174,7 +174,7 @@ namespace zion
          * This function validates if the detected planes correspond to a stair structure 
          * based on the number of detected planes and the length of the level.
          */
-        void stairDetectionFilter(Stair& stair);
+        void stairDetectionFilter(Stair& stair, bool is_valid_candidate);
 
         /**
          * @brief Constructs a Stair object from the detected planes.
