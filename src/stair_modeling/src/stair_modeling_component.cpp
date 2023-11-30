@@ -67,10 +67,10 @@ namespace zion
         qos_profile_stair.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         stair_pub_ = this->create_publisher<zion_msgs::msg::StairStamped>("~/stair",qos_profile_stair);
 
-        // rclcpp::QoS qos_profile_pcl_pub(10);
-        // qos_profile_pcl_pub.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-        // pcl_pub_= this->create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_filtered",qos_profile_pcl_pub);
-        // pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
+        rclcpp::QoS qos_profile_pcl_pub(10);
+        qos_profile_pcl_pub.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        pcl_pub_= this->create_publisher<sensor_msgs::msg::PointCloud2>("~/cloud_filtered",qos_profile_pcl_pub);
+        pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
 
 
         // init tf instances
@@ -89,6 +89,11 @@ namespace zion
         0.0, 255., 0.0, // green
         0.0, 0.0, 255., // blue
         };
+
+        stairs_arr_ = {};
+        stairs_counts_arr_ = {};
+        stair_detected_ = false;
+
     }
 
 
@@ -203,7 +208,6 @@ namespace zion
         debug_msg_ = "debug";
         floor_index_ = -1;  
         level_index_ = -1;
-        stair_detected_ = false;
         planes_empty_ = true;
     }
 
@@ -374,18 +378,121 @@ namespace zion
         debug_msg_ = debug_msg_ + "\nFloor index: " + std::to_string(floor_index_) + " | Level index: " + std::to_string(level_index_); 
     }
 
-    void StairModeling::checkForValidStair()
+    bool StairModeling::checkForValidCandidate(Stair& stair)
     {   
-        // check there is more then 1 plane
-        // and the level length is more then the min
-        // if(Planes_.size()>1 && Planes_[level_index_].length_>=k_length_min){
-            if(Planes_.size()>1 
+        // check the level length is more then the min
+            if(
             // && Stair_.step_length_>=k_length_min --> change to volume
-            && Stair_.step_height_>=k_height_min 
-            && Stair_.step_height_<=k_height_max
-            && (Stair_.step_length_*Stair_.step_width_)>=k_area_min){
-            stair_detected_ = true;
+            stair.step_height_>=k_height_min 
+            && stair.step_height_<=k_height_max
+            && (stair.step_length_*stair.step_width_)>=k_area_min){
+            return true;
+        }else{
+            return false;
         }
+    }
+
+// Function to calculate the Euclidean distance between two poses
+    double StairModeling::calculatePositionError(const Stair& stair1, const Stair& stair2)
+    {
+
+        double x1 = stair1.transition_point_.x, x2 = stair2.transition_point_.x;
+        double y1 = stair1.transition_point_.y, y2 = stair2.transition_point_.y;
+        double z1 = stair1.transition_point_.z, z2 = stair2.transition_point_.z;
+
+        // Calculate the error as the Euclidean distance
+        double error = std::sqrt(std::pow(x1 - x2, 2) 
+            + std::pow(y1 - y2, 2) 
+            + std::pow(z1 - z2, 2));
+        return error;
+    }
+
+    Stair StairModeling::avgStair(Stair& stair1, Stair& stair2)
+    {
+
+        stair1.transition_point_.x = (stair1.transition_point_.x + stair2.transition_point_.x)/2;
+        stair1.transition_point_.y = (stair1.transition_point_.y + stair2.transition_point_.y)/2;
+        stair1.transition_point_.z = (stair1.transition_point_.z + stair2.transition_point_.z)/2;
+
+        stair1.step_distance_ = (stair1.step_distance_ + stair2.step_distance_)/2;
+        stair1.step_height_ = (stair1.step_height_ + stair2.step_height_)/2;
+        stair1.step_width_ = (stair1.step_width_ + stair2.step_width_)/2;
+        stair1.step_length_ = (stair1.step_length_ + stair2.step_length_)/2;
+        stair1.step_angle_ = (stair1.step_angle_ + stair2.step_angle_)/2;
+        stair1.Planes_ = stair2.Planes_;
+
+        return stair1;
+    }
+
+    void StairModeling::stairDetectionFilter(Stair& stair){
+        int buffer_size = stairs_arr_.size();
+        RCLCPP_INFO_STREAM(this->get_logger(),"buffer size: " << buffer_size);
+
+        int i = 0; // init running pointer
+        int min_count_thresh = 3;
+        int max_count_thresh = 10; // maximum counts that stair can get
+        int max_count_i = -1; // the index maximum count in the buffer 
+        int max_count_val = 0;
+        double err_thresh = 0.05;
+        double err;
+        // iterate over the stairs candidates
+        while(i<buffer_size){
+                RCLCPP_INFO_STREAM(get_logger(),"index i: " << i);
+
+                                // check if coounts is below counts thresh -> then remove the stair from buffer             
+                if (stairs_counts_arr_[i]<=-min_count_thresh){
+                    RCLCPP_INFO_STREAM(this->get_logger(),"removig stair number: " << i);
+
+                    auto iter_stairs = stairs_arr_.begin() + i;
+                    auto iter_counts = stairs_counts_arr_.begin() + i;
+
+                    // erase elements
+                    stairs_arr_.erase(iter_stairs);
+                    stairs_counts_arr_.erase(iter_counts);
+                }else if (stairs_counts_arr_[i] > max_count_val)
+                {
+                max_count_val = std::min(stairs_counts_arr_[i], max_count_thresh); 
+                max_count_i = i;                
+                }
+
+                // check the error between poses
+                err = calculatePositionError(stairs_arr_[i], stair);
+                RCLCPP_INFO_STREAM(this->get_logger(),"position error: " << err);
+                
+                if(err< err_thresh && stairs_arr_[i].type_ == stair.type_){
+                    stairs_counts_arr_[i]++;
+                    stairs_arr_[i] = avgStair(stairs_arr_[i],stair);
+                    RCLCPP_INFO_STREAM(this->get_logger(),"stair matched to stair number: " << i 
+                                        << " and has total counts of: " << stairs_counts_arr_[i]);
+                    break;
+                }
+                else{
+                    stairs_counts_arr_[i]--;
+                    RCLCPP_INFO_STREAM(this->get_logger(),"error is too big so decrement count of index:" << i 
+                                        << " to " << stairs_counts_arr_[i]);
+                }
+
+                i++; // increment running pointer
+        } // while
+
+        if (max_count_val>= min_count_thresh){
+            RCLCPP_INFO_STREAM(this->get_logger(),"stair detected!!!!!! stair index: " << max_count_i);
+            detected_stair_filtered_ = stairs_arr_[max_count_i];
+            stair_detected_ = true;
+        }else{
+            RCLCPP_INFO_STREAM(this->get_logger(),"stair still doesn't detected!! index of stair with max count is: " << max_count_i);
+            stair_detected_ = false;
+        }
+
+        // if stair is not matching to other stair in the buffer 
+        // *or* buffer lenght is zero -> push the stair to the buffer
+        if (i == buffer_size){
+            RCLCPP_INFO_STREAM(this->get_logger(),"push back stair to buffer! ");
+            stairs_arr_.push_back(stair);
+            stairs_counts_arr_.push_back(1);
+        }
+
+
     }
 
     void StairModeling::getStair()
@@ -441,16 +548,16 @@ namespace zion
     {
         geometry_msgs::msg::Pose pose;
 
-        stair_pose_->position.x = Stair_.transition_point_.x;
-        stair_pose_->position.y = Stair_.transition_point_.y;
-        stair_pose_->position.z = Stair_.transition_point_.z;
+        stair_pose_->position.x = detected_stair_filtered_.transition_point_.x;
+        stair_pose_->position.y = detected_stair_filtered_.transition_point_.y;
+        stair_pose_->position.z = detected_stair_filtered_.transition_point_.z;
 
         tf2::Matrix3x3 tf_rotation;
         tf2::Quaternion tf_quaternion;
         geometry_msgs::msg::Quaternion ros_quaternion;
-        tf_rotation.setValue(static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(0, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(0, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(0, 2)),
-                        static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(1, 2)),
-                        static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(Stair_.Planes_[level_index_].plane_dir_(2, 2)));
+        tf_rotation.setValue(static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 2)),
+                        static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 2)),
+                        static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 2)));
 
         double roll ; double pitch ; double yaw;
         tf_rotation.getEulerYPR(yaw,pitch,roll);
@@ -518,13 +625,13 @@ namespace zion
 
         // declare stair_msg
 
-        stair_stamped_msg.stair.id = Stair_.type_;
-        stair_stamped_msg.stair.distance = Stair_.step_distance_;
-        stair_stamped_msg.stair.height = Stair_.step_height_;
-        stair_stamped_msg.stair.angle = Stair_.step_angle_;
-        stair_stamped_msg.stair.length = Stair_.step_length_;
-        stair_stamped_msg.stair.width = Stair_.step_width_;
-        stair_stamped_msg.stair.pose = *stair_pose_;
+        stair_stamped_msg.stair.id = detected_stair_filtered_.type_;
+        stair_stamped_msg.stair.distance = detected_stair_filtered_.step_distance_;
+        stair_stamped_msg.stair.height = detected_stair_filtered_.step_height_;
+        stair_stamped_msg.stair.angle = detected_stair_filtered_.step_angle_;
+        stair_stamped_msg.stair.length = detected_stair_filtered_.step_length_;
+        stair_stamped_msg.stair.width = detected_stair_filtered_.step_width_;
+        stair_stamped_msg.stair.pose = *stair_pose_; /////////////// change it
 
         stair_pub_->publish(stair_stamped_msg);
     }
@@ -629,11 +736,12 @@ namespace zion
 
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
     {
-        // RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
 
         reset();
 
         geometry_msgs::msg::TransformStamped base_projected2camera;
+
+        RCLCPP_INFO_ONCE(get_logger(),"pcl Callback is running");
 
         // Check if transformation between frames is available
         if (tf_buffer_->canTransform(output_frame_, input_frame_, tf2::TimePointZero))
@@ -648,6 +756,7 @@ namespace zion
                 // Convert ROS transform to Eigen transform
                 c2cp = tf2::transformToEigen(base_projected2camera);
 
+
                 // Initialize point clouds
                 pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
                 // pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
@@ -659,12 +768,15 @@ namespace zion
                 Utilities::voxelizingDownsample(input_cloud, input_cloud,
                                                 leaf_size_xy_,leaf_size_z_);
 
+
                 Utilities::transformCloud(c2cp,input_cloud,input_cloud);
+
 
                 Utilities::cropping(input_cloud, cloud_,
                                 min_x_,max_x_,
                                 min_y_,max_y_,
                                 min_z_,max_z_);
+
 
                 // Convert processed PCL point cloud to ROS message
                 pcl::toROSMsg(*cloud_, *pcl_buffer_);
@@ -672,23 +784,44 @@ namespace zion
                 pcl_buffer_->header.frame_id = output_frame_;
                 pcl_pub_->publish(*pcl_buffer_);
 
+
+
                 // RANSAC-based plane segmentation
                 // cloud_ = output_cloud;
                 getPlanes(cloud_);
 
                 if(!planes_empty_){
                     // find the floor plane
-                    
+                    RCLCPP_INFO(get_logger(),"planes not empty!");
+
                     findFloor();
-                    if(Planes_.size()>1){getStair();}
-                    checkForValidStair();
+                    RCLCPP_INFO(get_logger(),"find floor!");
+
+                    bool is_valid_candidate = false;
+                    if(Planes_.size()>1){
+                        // get the raw stair properties
+                        getStair();
+                        RCLCPP_INFO(get_logger(),"getStair!");
+
+                        // chack if its really proper candidate
+                        is_valid_candidate = checkForValidCandidate(Stair_);
+                        RCLCPP_INFO_STREAM(get_logger(),"checkForValidCandidate! is_valid_candidate = " 
+                                                        << is_valid_candidate);
+
+                        }
+
+                        // if its true candidate apply get the stair pose and filter the stairs detections
+                        if(is_valid_candidate){
+                            RCLCPP_INFO_STREAM(get_logger(),"getStairPose !");
+                            stairDetectionFilter(Stair_);
+                        }
 
                     // if stair detected set the stair instance and compute geometric parameters
                     if(stair_detected_){
-                        // getStair();
                         // setStairTf();
-                        getStairPose();
                         // Publish the processed point cloud and custom msgs
+                        RCLCPP_INFO_STREAM(this->get_logger(),"publish!!!!!! ");
+                        getStairPose();
                         publishHullsAsMarkerArray(output_frame_);
                         publishStairPose(output_frame_);
                         publishStair(output_frame_);

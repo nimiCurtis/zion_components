@@ -166,8 +166,16 @@ namespace zion
          * This function validates if the detected planes correspond to a stair structure 
          * based on the number of detected planes and the length of the level.
          */
-        void checkForValidStair();
-        
+        bool checkForValidCandidate(Stair& stair);
+
+
+        /**
+         * @brief Checks if there is a valid stair detected.
+         * This function validates if the detected planes correspond to a stair structure 
+         * based on the number of detected planes and the length of the level.
+         */
+        void stairDetectionFilter(Stair& stair);
+
         /**
          * @brief Constructs a Stair object from the detected planes.
          * This function initializes the Stair object based on the properties of the detected planes.
@@ -181,6 +189,11 @@ namespace zion
          * based on the transition point and the principal directions of the plane representing the stair level.
          */
         void getStairPose();
+
+        double calculatePositionError(const Stair& stair1, const Stair& stair2);
+
+        Stair avgStair(Stair& stair1, Stair& stair2);
+
 
         // Not in use. 
         void calcPlaneSlope();
@@ -212,6 +225,10 @@ namespace zion
         bool stair_detected_; ///< Flag indicating whether a stair has been detected.
         int floor_index_; ///< Index of the detected floor plane.
         int level_index_; ///< Index of the detected level plane.
+
+        Stair detected_stair_filtered_;
+        std::vector<Stair> stairs_arr_; ///< filter detections of valid candidates
+        std::vector<int> stairs_counts_arr_; ///< counts of valid candidates for filtering
 
         // Transformation matrix.
         Eigen::Affine3d c2cp;

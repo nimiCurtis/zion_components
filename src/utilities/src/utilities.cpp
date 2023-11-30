@@ -215,3 +215,5 @@ bool getPointFromPixelCoordinates(pcl::PointXYZRGB& point, int pixel_x, int pixe
 
 
 
+
+
