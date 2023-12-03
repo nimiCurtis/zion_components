@@ -842,92 +842,6 @@ namespace zion
 
     }
 
-    void StairModeling::publishHullsAsMarkerArray(const std::string& cloud_frame)
-    {
-
-    geometry_msgs::msg::Point point;
-    std_msgs::msg::ColorRGBA point_color;
-    visualization_msgs::msg::MarkerArray ma;
-
-    if(Planes_.size()>0){
-        for (size_t i = 0; i < Planes_.size(); i++){
-
-            visualization_msgs::msg::Marker marker;
-            marker.header.frame_id = cloud_frame;
-            marker.header.stamp = this->get_clock()->now();
-            marker.ns = "hull_" + std::to_string(i);
-            marker.id = i;
-            marker.type = visualization_msgs::msg::Marker::LINE_LIST;
-            marker.action = visualization_msgs::msg::Marker::ADD;
-            marker.pose.position.x = 0;
-            marker.pose.position.y = 0;
-            marker.pose.position.z = 0;
-            marker.pose.orientation.x = 0.0;
-            marker.pose.orientation.y = 0.0;
-            marker.pose.orientation.z = 0.0;
-            marker.pose.orientation.w = 1.0;
-            marker.scale.x = 0.03;
-            marker.scale.y = 0.03;
-            marker.scale.z = 0.03;
-            marker.color.a = 1.0;
-
-            const int nColor = i % (colors_.size()/3);
-            const double r = colors_[nColor*3]*255.0;
-            const double g = colors_[nColor*3+1]*255.0;
-            const double b = colors_[nColor*3+2]*255.0;
-            marker.points.reserve(Planes_[i].hull_->points.size());
-            marker.colors.reserve(Planes_[i].hull_->points.size());
-
-            for (size_t j = 1; j < Planes_[i].hull_->points.size(); j++){
-            point.x = Planes_[i].hull_->points[j-1].x;
-            point.y = Planes_[i].hull_->points[j-1].y;
-            point.z = Planes_[i].hull_->points[j-1].z;
-            point_color.r = r;
-            point_color.g = g;
-            point_color.b = b;
-            point_color.a = 1.0;
-            marker.colors.push_back(point_color);
-            marker.points.push_back(point);
-
-            point.x = Planes_[i].hull_->points[j].x;
-            point.y = Planes_[i].hull_->points[j].y;
-            point.z = Planes_[i].hull_->points[j].z;
-            point_color.r = r;
-            point_color.g = g;
-            point_color.b = b;
-            point_color.a = 1.0;
-            marker.colors.push_back(point_color);
-            marker.points.push_back(point);
-            }
-
-            // start to end line:
-            point.x = Planes_[i].hull_->points[0].x;
-            point.y = Planes_[i].hull_->points[0].y;
-            point.z = Planes_[i].hull_->points[0].z;
-            point_color.r = r;
-            point_color.g = g;
-            point_color.b = b;
-            point_color.a = 1.0;
-            marker.colors.push_back(point_color);
-            marker.points.push_back(point);
-
-            point.x = Planes_[i].hull_->points[ Planes_[i].hull_->points.size()-1 ].x;
-            point.y = Planes_[i].hull_->points[ Planes_[i].hull_->points.size()-1 ].y;
-            point.z = Planes_[i].hull_->points[ Planes_[i].hull_->points.size()-1 ].z;
-            point_color.r = r;
-            point_color.g = g;
-            point_color.b = b;
-            point_color.a = 1.0;
-            marker.colors.push_back(point_color);
-            marker.points.push_back(point);
-
-            marker.frame_locked = false;
-            ma.markers.push_back(marker);
-        }
-
-        hull_marker_array_pub_->publish(ma);
-        }
-    }
 
     void StairModeling::publishStairPose(const geometry_msgs::msg::Pose& pose,
                                         const std::string &cloud_frame,
@@ -969,7 +883,7 @@ namespace zion
                 base_projected2camera = tf_buffer_->lookupTransform(
                     output_frame_, input_frame_,
                     tf2::TimePointZero,
-                    10ms);
+                    5ms);
 
                 // Convert ROS transform to Eigen transform
                 c2cp = tf2::transformToEigen(base_projected2camera);
