@@ -206,6 +206,23 @@ namespace zion
          */
         void stairDetectionFilter(Stair& stair, bool is_valid_candidate);
 
+        void decrementCounter(std::vector<int>& counter_buffer);
+
+        void removeBelowThresh(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer);
+        
+        void pushToBuffers(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer,
+                                            Stair& stair);
+
+        void updateBuffers(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer,
+                                            Stair& stair);
+        
+        bool isDetectedStair(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer,
+                                            Stair& detect_stair);
+
         /**
          * @brief Constructs a Stair object from the detected planes.
          * This function initializes the Stair object based on the properties of the detected planes.
@@ -297,6 +314,10 @@ namespace zion
 
         std::string input_frame_; ///< Name of the input frame for the processed data.
         std::string output_frame_; ///< Name of the output frame for the processed data.
+
+        int filter_min_limit_; // can put as param
+        int filter_max_limit_; // maximum counts that stair can get,can put as param
+        double pos_err_thresh_;  // can put as param
 
         bool planes_empty_; ///< No planes are found. True == there is no planes found from segmentation.
         bool debug_; ///< Flag for debugging mode.

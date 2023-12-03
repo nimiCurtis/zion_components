@@ -194,6 +194,23 @@ namespace zion
         this->declare_parameter("crop_box.max_z", 1.0);
         this->get_parameter("crop_box.max_z", max_z_);
         RCLCPP_INFO(get_logger(),"* max_z: %f", max_z_);
+
+        // Stair filter params
+        this->declare_parameter("stair_filter.filter_min_limit", 3);
+        this->get_parameter("stair_filter.filter_min_limit", filter_min_limit_);
+        RCLCPP_INFO(get_logger(),"* filter_min_limit: %d", filter_min_limit_);
+
+        // Stair filter params
+        this->declare_parameter("stair_filter.filter_max_limit", 10);
+        this->get_parameter("stair_filter.filter_max_limit", filter_max_limit_);
+        RCLCPP_INFO(get_logger(),"* filter_max_limit: %d", filter_max_limit_);
+
+        // Stair filter params
+        this->declare_parameter("stair_filter.pos_err_thresh", 0.05);
+        this->get_parameter("stair_filter.pos_err_thresh", pos_err_thresh_);
+        RCLCPP_INFO(get_logger(),"* pos_err_thresh: %f", pos_err_thresh_);
+
+        RCLCPP_INFO(get_logger(),"***************************************");
     }
 
     void StairModeling::printDebug()
@@ -434,85 +451,102 @@ namespace zion
         return stair1;
     }
 
-    void StairModeling::stairDetectionFilter(Stair& stair, bool is_valid_candidate){
-        int buffer_size = stairs_arr_.size();
-        RCLCPP_INFO_STREAM(this->get_logger(),"buffer size: " << buffer_size);
+    void StairModeling::decrementCounter(std::vector<int>& counter_buffer){
+        RCLCPP_INFO_STREAM(this->get_logger(),"Decrementing Counter | buffer size: " << counter_buffer.size());
+        // decrement every counts
+        for (size_t j=0; j<counter_buffer.size(); j++){
+            
+            stairs_counts_arr_[j]--;
+            RCLCPP_INFO_STREAM(this->get_logger(),"Decrement count of stair index: " << j 
+                                        << " to: " << stairs_counts_arr_[j]);
+        } // for
+    }
 
-        int i = 0; // init running pointer
-        int min_count_thresh = 3; // can put as param
-        int max_count_thresh = 10; // maximum counts that stair can get,can put as param
-        int max_count_i = -1; // the index maximum count in the buffer, can put as param
-        int max_count_val = 0; 
-        double err_thresh = 0.05; // can put as param
+    void StairModeling::removeBelowThresh(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer)
+    {
+        for (size_t i=0; i<counter_buffer.size(); i++){
+            // check if coounts is below counts thresh -> then remove the stair from buffer             
+            if (counter_buffer[i]<=-filter_min_limit_){
+                        RCLCPP_INFO_STREAM(this->get_logger(),"removing stair number: " << i);
+                        auto iter_stairs = stairs_buffer.begin() + i;
+                        auto iter_counts = counter_buffer.begin() + i;
+                        // erase elements
+                        stairs_buffer.erase(iter_stairs);
+                        counter_buffer.erase(iter_counts);
+            }
+        }
+        RCLCPP_INFO_STREAM(this->get_logger(),"buffer cleaning | (post) buffer size: " << counter_buffer.size());
+    }
+
+    void StairModeling::pushToBuffers(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer,
+                                            Stair& stair)
+    {
+        stairs_buffer.push_back(stair);
+        counter_buffer.push_back(1);
+        RCLCPP_INFO_STREAM(this->get_logger(),"push to buffer | (post) buffer size: " << counter_buffer.size());
+    }
+
+    void StairModeling::updateBuffers(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer,
+                                            Stair& stair)
+    {
         double err;
+        bool is_match = false;
+        size_t i;
 
-        // iterate over the stairs candidates
-        while(i<buffer_size){
+        RCLCPP_INFO_STREAM(this->get_logger(),"update buffer | (pre) buffer size: " << counter_buffer.size());
+        for (i=0;i<counter_buffer.size(); i++){
+            err = calculatePositionError(stairs_buffer[i], stair);
+            RCLCPP_INFO_STREAM(this->get_logger(),"position error: " << err
+                                << " | stair index: " << i);
+            if(err< pos_err_thresh_ && stairs_buffer[i].type_ == stair.type_ && !is_match){
+                    counter_buffer[i]++;
+                    avgStair(stairs_buffer[i],stair); 
+                    is_match = true;
+                    RCLCPP_INFO_STREAM(this->get_logger(),"stair matched to stair number: " << i 
+                                        << " and has total counts of: " << counter_buffer[i]);
+            }
+            else{
+                counter_buffer[i]--;
+                RCLCPP_INFO_STREAM(this->get_logger(),"error is too big or type is discorrect!! so decrement count of index: " << i 
+                                    << " to: " << counter_buffer[i]);
+            }
+        }
+        if (i==counter_buffer.size()){
+            pushToBuffers(stairs_buffer, counter_buffer, stair);
+        }
+    }
 
-                RCLCPP_INFO_STREAM(get_logger(),"index i: " << i);
+    bool StairModeling::isDetectedStair(std::vector<Stair>& stairs_buffer,
+                                            std::vector<int>& counter_buffer,
+                                            Stair& detect_stair)
+    {
+        
+        int max_count = -filter_min_limit_;
+        size_t max_count_i;
+        size_t i;
 
-                // check if coounts is below counts thresh -> then remove the stair from buffer             
-                if (stairs_counts_arr_[i]<=-min_count_thresh){
-                    RCLCPP_INFO_STREAM(this->get_logger(),"removig stair number: " << i);
-
-                    auto iter_stairs = stairs_arr_.begin() + i;
-                    auto iter_counts = stairs_counts_arr_.begin() + i;
-
-                    // erase elements
-                    stairs_arr_.erase(iter_stairs);
-                    stairs_counts_arr_.erase(iter_counts);
-                }else if (stairs_counts_arr_[i] > max_count_val)
-                {
-                stairs_counts_arr_[i] = std::min(stairs_counts_arr_[i], max_count_thresh);
-                max_count_val =  stairs_counts_arr_[i];
+        RCLCPP_INFO_STREAM(this->get_logger(),"check for detected stair | (pre) buffer size:" << counter_buffer.size());
+        
+        for (i=0;i<counter_buffer.size(); i++){
+            if (counter_buffer[i] > max_count){
+                counter_buffer[i] = std::min(counter_buffer[i], filter_max_limit_);
+                max_count =  counter_buffer[i];
                 max_count_i = i;                
                 }
-
-
-                if(is_valid_candidate){
-                    // check the error between poses
-                    err = calculatePositionError(stairs_arr_[i], stair);
-                    RCLCPP_INFO_STREAM(this->get_logger(),"position error: " << err);
-
-                    if(err< err_thresh && stairs_arr_[i].type_ == stair.type_){
-                        stairs_counts_arr_[i]++;
-                        stairs_arr_[i] = avgStair(stairs_arr_[i],stair); 
-                        RCLCPP_INFO_STREAM(this->get_logger(),"stair matched to stair number: " << i 
-                                            << " and has total counts of: " << stairs_counts_arr_[i]);
-                        break;
-                    }
-                    else{
-                        stairs_counts_arr_[i]--;
-                        RCLCPP_INFO_STREAM(this->get_logger(),"error is too big or type is discorrect!! so decrement count of index: " << i 
-                                            << " to " << stairs_counts_arr_[i]);
-                    }
-                } // is_valid_candidate requierment
-                else{
-                    stairs_counts_arr_[i]--;
-                    RCLCPP_INFO_STREAM(this->get_logger(),"not valid candidate!! so decrement count of index:" << i 
-                                            << " to " << stairs_counts_arr_[i]);
-                }
-                i++; // increment running pointer
-        } // while
-
-        if (max_count_val>= min_count_thresh){
-            RCLCPP_INFO_STREAM(this->get_logger(),"stair detected!!!!!! stair index: " << max_count_i);
-            detected_stair_filtered_ = stairs_arr_[max_count_i];
-            stair_detected_ = true;
-        }else{
-            RCLCPP_INFO_STREAM(this->get_logger(),"stair still doesn't detected!! index of stair with max count is: " << max_count_i);
-            stair_detected_ = false;
         }
 
-        // if stair is not matching to other stair in the buffer 
-        // *or* buffer lenght is zero -> push the stair to the buffer
-        if (i == buffer_size && is_valid_candidate){
-            RCLCPP_INFO_STREAM(this->get_logger(),"push back stair to buffer! ");
-            stairs_arr_.push_back(stair);
-            stairs_counts_arr_.push_back(1);
+        if (max_count >= filter_min_limit_){
+                detect_stair = stairs_buffer[max_count_i];
+                RCLCPP_INFO_STREAM(this->get_logger(),"stair detected index: " << max_count_i);
+                return true;
         }
-
-
+        // else false stair detection
+        else{
+                return false;
+        }
     }
 
     void StairModeling::getStair()
@@ -733,7 +767,7 @@ namespace zion
 
             visualization_msgs::msg::Marker marker;
             marker.header.frame_id = cloud_frame;
-            marker.header.stamp = this->get_clock()->now();
+            marker.header.stamp = now;
             marker.ns = "hull_" + std::to_string(i);
             marker.id = i;
             marker.type = visualization_msgs::msg::Marker::LINE_LIST;
@@ -925,6 +959,7 @@ namespace zion
         geometry_msgs::msg::TransformStamped base_projected2camera;
 
         RCLCPP_INFO_ONCE(get_logger(),"pcl Callback is running");
+        RCLCPP_INFO_STREAM(this->get_logger()," " );
 
         // Check if transformation between frames is available
         if (tf_buffer_->canTransform(output_frame_, input_frame_, tf2::TimePointZero))
@@ -991,15 +1026,42 @@ namespace zion
                         is_valid_candidate = checkForValidCandidate(Stair_);
                         RCLCPP_INFO_STREAM(get_logger(),"checkForValidCandidate! is_valid_candidate = " 
                                                         << is_valid_candidate);
+                        if(!is_valid_candidate){
+                            if (stairs_arr_.size()>0){
+                                decrementCounter(stairs_counts_arr_);
+                                removeBelowThresh(stairs_arr_,stairs_counts_arr_); // here there is a possible of 0 elements after cleaning 
+                            }
+                        }
+                        // is valid candidate
+                        else{
+                            if(stairs_arr_.size()==0){
+                                pushToBuffers(stairs_arr_,stairs_counts_arr_, Stair_);
+                            }
+                            // is valid and buffers got more then 1 element
+                            else{
+                                updateBuffers(stairs_arr_,stairs_counts_arr_, Stair_);
+                                removeBelowThresh(stairs_arr_,stairs_counts_arr_); // here there is a possible of 0 elements after cleaning 
+                            }
                         }
 
-                    // if its true candidate apply get the stair pose and filter the stairs detections
-                    // filtering over all iterations (not only when acquiring candidates (more then 1 plane)) 
-                    stairDetectionFilter(Stair_, is_valid_candidate);
+                        
+                    // if there is single plane -> keep decrementing
+                    }else{
+                        if (stairs_arr_.size()>0){
+                                decrementCounter(stairs_counts_arr_);
+                                removeBelowThresh(stairs_arr_,stairs_counts_arr_); // here there is a possible of 0 elements after cleaning 
+                        }
+                    }
 
-                    rclcpp::Time now = this->get_clock()->now();
+                    if (stairs_arr_.size()>0){
+                            stair_detected_ = isDetectedStair(stairs_arr_, stairs_counts_arr_, detected_stair_filtered_); //
+                    }else{
+                        stair_detected_ = false;
+                    }
+
+                    RCLCPP_INFO_STREAM(this->get_logger(),"is stair detected: " << stair_detected_);
+
                     if(stair_detected_){
-
                     // if stair detected set the stair instance and compute geometric parameters
                         // setStairTf();
                         // Publish the processed point cloud and custom msgs
@@ -1007,7 +1069,7 @@ namespace zion
                         // getStairPose();
                         
 
-                        
+                        rclcpp::Time now = this->get_clock()->now();
                         // publish stair hulls as marker array
                         publishPlanesHulls(detected_stair_filtered_.Planes_,
                                             output_frame_,
@@ -1025,13 +1087,12 @@ namespace zion
 
                     }
                     else if (Planes_.size()==1) //just plane detected
-                    {
+                    {   
+                        rclcpp::Time now = this->get_clock()->now();
                         publishPlanesHulls(Planes_,
                                             output_frame_,
                                             now); 
                     }
-                    
-                    
                 }
             }
             catch (const tf2::TransformException & ex) {
