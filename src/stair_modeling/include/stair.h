@@ -18,6 +18,10 @@
 // Third party libraries
 #include <vector>
 
+// ROS application/library includes
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+
 // Custom includes
 #include "plane.h"
 #include "utilities.h"
@@ -78,6 +82,11 @@ public:
      */
     static bool checkValidHeight(float source_plane_h, float target_plane_h);
 
+    geometry_msgs::msg::Quaternion getStairOrientation();
+
+    geometry_msgs::msg::Quaternion getStairOrientation(const Stair& stair);
+
+
     // Members:
     std::vector<Plane> Planes_; // Step candidates given by the detection process
     int type_; // 0 = upwards, 1 = downwards
@@ -87,6 +96,7 @@ public:
     float step_distance_; // Distance between steps
     float step_angle_; // Angle of the stair
     pcl::PointXYZRGB transition_point_ ; // the transition point between floor and level
+    geometry_msgs::msg::Pose stair_pose_; ///< Pose of the detected stair.
 
 
 private:

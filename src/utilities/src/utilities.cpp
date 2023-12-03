@@ -199,18 +199,19 @@ void Utilities::colorize(const pcl::PointCloud<pcl::PointXYZRGB> &pc,
     }
 }
 
-bool getPointFromPixelCoordinates(pcl::PointXYZRGB& point, int pixel_x, int pixel_y, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pcl_cloud)
-{
-    // Check if the pixel coordinates are within the valid range
-    if (pixel_x >= 0 && pixel_x < pcl_cloud->width && pixel_y >= 0 && pixel_y < pcl_cloud->height) {
-        // Calculate the index in the point cloud corresponding to the pixel coordinates
-        int index = pixel_y * pcl_cloud->width + pixel_x;
-        point = pcl_cloud->at(index);
-        return true;
-    } else {
-        return false;
-    }
-}
+
+// bool getPointFromPixelCoordinates(pcl::PointXYZRGB& point, int pixel_x, int pixel_y, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pcl_cloud)
+// {
+//     // Check if the pixel coordinates are within the valid range
+//     if (pixel_x >= 0 && pixel_x < pcl_cloud->width && pixel_y >= 0 && pixel_y < pcl_cloud->height) {
+//         // Calculate the index in the point cloud corresponding to the pixel coordinates
+//         int index = pixel_y * pcl_cloud->width + pixel_x;
+//         point = pcl_cloud->at(index);
+//         return true;
+//     } else {
+//         return false;
+//     }
+// }
 
 
 

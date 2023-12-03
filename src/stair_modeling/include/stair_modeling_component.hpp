@@ -107,6 +107,16 @@ namespace zion
          */
         void publishHullsAsMarkerArray(const std::string& cloud_frame);
 
+
+        /**
+         * @brief Publishes the convex hulls of detected planes as a MarkerArray.
+         * @param cloud_frame The frame ID of the point cloud.
+         */
+
+        void publishPlanesHulls(const std::vector<Plane>& planes,
+                                const std::string& cloud_frame,
+                                rclcpp::Time& now);
+
         /**
          * @brief Publishes the detected stair properties to a ROS topic.
          * This function takes the properties of the detected stair and constructs a message which 
@@ -115,11 +125,31 @@ namespace zion
          */
         void publishStairPose(const std::string &cloud_frame);
 
+
+        /**
+         * @brief Publishes the detected stair properties to a ROS topic.
+         * This function takes the properties of the detected stair and constructs a message which 
+         * is then published to a ROS topic for further use or visualization.
+         * @param cloud_frame The frame ID associated with the detected stair.
+         */
+        void publishStairPose(const geometry_msgs::msg::Pose& pose,
+                                const std::string &cloud_frame,
+                                rclcpp::Time& now);
+
         /**
          * @brief Publishes the the Stair msgs.
          * @param cloud_frame The frame ID of the point cloud.
          */
         void publishStair(const std::string& cloud_frame);
+
+        /**
+         * @brief Publishes the the Stair msgs.
+         * @param cloud_frame The frame ID of the point cloud.
+         */
+
+        void publishStair(const Stair& stair,
+                            const std::string& cloud_frame,
+                            rclcpp::Time& now);
 
         /**
          * @brief Loads parameters from the parameter server.
@@ -188,7 +218,10 @@ namespace zion
          * This function determines the position and orientation of the detected stair 
          * based on the transition point and the principal directions of the plane representing the stair level.
          */
-        void getStairPose();
+        // void getStairPose();
+        geometry_msgs::msg::Quaternion getStairOrientation();
+
+        geometry_msgs::msg::Quaternion getStairOrientation(const Stair& stair);
 
         double calculatePositionError(const Stair& stair1, const Stair& stair2);
 

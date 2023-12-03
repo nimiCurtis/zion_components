@@ -396,10 +396,14 @@ namespace zion
     double StairModeling::calculatePositionError(const Stair& stair1, const Stair& stair2)
     {
 
-        double x1 = stair1.transition_point_.x, x2 = stair2.transition_point_.x;
-        double y1 = stair1.transition_point_.y, y2 = stair2.transition_point_.y;
-        double z1 = stair1.transition_point_.z, z2 = stair2.transition_point_.z;
+        // double x1 = stair1.transition_point_.x, x2 = stair2.transition_point_.x;
+        // double y1 = stair1.transition_point_.y, y2 = stair2.transition_point_.y;
+        // double z1 = stair1.transition_point_.z, z2 = stair2.transition_point_.z;
 
+        double x1 = stair1.stair_pose_.position.x, x2 = stair2.stair_pose_.position.x;
+        double y1 = stair1.stair_pose_.position.y, y2 = stair2.stair_pose_.position.y;
+        double z1 = stair1.stair_pose_.position.z, z2 = stair2.stair_pose_.position.z;
+        
         // Calculate the error as the Euclidean distance
         double error = std::sqrt(std::pow(x1 - x2, 2) 
             + std::pow(y1 - y2, 2) 
@@ -410,9 +414,15 @@ namespace zion
     Stair StairModeling::avgStair(Stair& stair1, Stair& stair2)
     {
 
-        stair1.transition_point_.x = (stair1.transition_point_.x + stair2.transition_point_.x)/2;
-        stair1.transition_point_.y = (stair1.transition_point_.y + stair2.transition_point_.y)/2;
-        stair1.transition_point_.z = (stair1.transition_point_.z + stair2.transition_point_.z)/2;
+        // stair1.transition_point_.x = (stair1.transition_point_.x + stair2.transition_point_.x)/2;
+        // stair1.transition_point_.y = (stair1.transition_point_.y + stair2.transition_point_.y)/2;
+        // stair1.transition_point_.z = (stair1.transition_point_.z + stair2.transition_point_.z)/2;
+
+        stair1.stair_pose_.position.x = (stair1.stair_pose_.position.x + stair2.stair_pose_.position.x)/2;
+        stair1.stair_pose_.position.y = (stair1.stair_pose_.position.y + stair2.stair_pose_.position.y)/2;
+        stair1.stair_pose_.position.z = (stair1.stair_pose_.position.z + stair2.stair_pose_.position.z)/2;
+
+        stair1.stair_pose_.orientation = stair2.stair_pose_.orientation; // for now
 
         stair1.step_distance_ = (stair1.step_distance_ + stair2.step_distance_)/2;
         stair1.step_height_ = (stair1.step_height_ + stair2.step_height_)/2;
@@ -435,10 +445,9 @@ namespace zion
         int max_count_val = 0; 
         double err_thresh = 0.05; // can put as param
         double err;
+
         // iterate over the stairs candidates
-
         while(i<buffer_size){
-
 
                 RCLCPP_INFO_STREAM(get_logger(),"index i: " << i);
 
@@ -452,7 +461,6 @@ namespace zion
                     // erase elements
                     stairs_arr_.erase(iter_stairs);
                     stairs_counts_arr_.erase(iter_counts);
-
                 }else if (stairs_counts_arr_[i] > max_count_val)
                 {
                 stairs_counts_arr_[i] = std::min(stairs_counts_arr_[i], max_count_thresh);
@@ -468,7 +476,7 @@ namespace zion
 
                     if(err< err_thresh && stairs_arr_[i].type_ == stair.type_){
                         stairs_counts_arr_[i]++;
-                        stairs_arr_[i] = avgStair(stairs_arr_[i],stair);
+                        stairs_arr_[i] = avgStair(stairs_arr_[i],stair); 
                         RCLCPP_INFO_STREAM(this->get_logger(),"stair matched to stair number: " << i 
                                             << " and has total counts of: " << stairs_counts_arr_[i]);
                         break;
@@ -520,35 +528,52 @@ namespace zion
             Stair_.type_ = 0; // 0 = stair is upward
             Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
             Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
-            Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
-            Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
+            // Stair_.transition_point_.y = Stair_.Planes_[level_index_].center_.y;
+            // Stair_.transition_point_.z = Stair_.Planes_[level_index_].center_.z;
+
+            Stair_.stair_pose_.position.y = Stair_.Planes_[level_index_].center_.y;
+            Stair_.stair_pose_.position.z = Stair_.Planes_[level_index_].center_.z;
+
             // If upwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the level plane's cloud
             float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, true);
-            Stair_.transition_point_.x = x_distance;
+            // Stair_.transition_point_.x = x_distance;
+            Stair_.stair_pose_.position.x = x_distance;
+
+
             debug_msg_ = debug_msg_ + "\nStair type: Up";
             Stair_.step_distance_ = x_distance;
 
         }else{ // -> stair descending
+            debug_msg_ = debug_msg_ + "\nStair type: Down";
             Stair_.type_ = 1; // 1 = downwards
             Stair_.step_length_ = Stair_.Planes_[floor_index_].length_;
             Stair_.step_width_ = Stair_.Planes_[floor_index_].width_;
-            Stair_.transition_point_.y = Stair_.Planes_[floor_index_].center_.y;
-            Stair_.transition_point_.z = Stair_.Planes_[floor_index_].center_.z;
+            // Stair_.transition_point_.y = Stair_.Planes_[floor_index_].center_.y;
+            // Stair_.transition_point_.z = Stair_.Planes_[floor_index_].center_.z;
+
+            Stair_.stair_pose_.position.y = Stair_.Planes_[floor_index_].center_.y;
+            Stair_.stair_pose_.position.z = Stair_.Planes_[floor_index_].center_.z;
 
             // compute distance
             // If downwards, calculate the distance by finding the average x-coordinate
             // of the points below yThreshold in the second plane's cloud
             float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[floor_index_].cloud_, y_threshold_, x_neighbors_, false);
-            Stair_.transition_point_.x = x_distance;
-            debug_msg_ = debug_msg_ + "\nStair type: Down";
+            // Stair_.transition_point_.x = x_distance;
+            Stair_.stair_pose_.position.x = x_distance;
             Stair_.step_distance_ = x_distance;
         }
-        Stair_.transition_point_.x = Stair_.step_distance_;
+
+        // compute stair orientation
+        Stair_.stair_pose_.orientation = getStairOrientation(Stair_);
+
         // compute height
         Stair_.step_height_ = fabs(floor_h-level_h);
-        // compute angle
-        Stair_.step_angle_ = Utilities::rad2deg(std::atan2(Stair_.transition_point_.y,Stair_.transition_point_.x));
+        // compute yaw angle w.r.t camera heading
+        Stair_.step_angle_ = Utilities::rad2deg(std::atan2(Stair_.stair_pose_.position.y,
+                                                            Stair_.stair_pose_.position.x));
+        // Stair_.step_angle_ = Utilities::rad2deg(std::atan2(Stair_.transition_point_.y,
+        //                                                     Stair_.transition_point_.x));
 
         // debug
         debug_msg_ = debug_msg_ + "\nHeight is:  " + std::to_string(Stair_.step_height_ );
@@ -556,20 +581,49 @@ namespace zion
     }
 
 
-    void StairModeling::getStairPose()
-    {
-        geometry_msgs::msg::Pose pose;
+    // void StairModeling::getStairPose()
+    // {
+    //     geometry_msgs::msg::Pose pose;
 
-        stair_pose_->position.x = detected_stair_filtered_.transition_point_.x;
-        stair_pose_->position.y = detected_stair_filtered_.transition_point_.y;
-        stair_pose_->position.z = detected_stair_filtered_.transition_point_.z;
+    //     stair_pose_->position.x = detected_stair_filtered_.transition_point_.x;
+    //     stair_pose_->position.y = detected_stair_filtered_.transition_point_.y;
+    //     stair_pose_->position.z = detected_stair_filtered_.transition_point_.z;
+
+    //     tf2::Matrix3x3 tf_rotation;
+    //     tf2::Quaternion tf_quaternion;
+    //     geometry_msgs::msg::Quaternion ros_quaternion;
+    //     tf_rotation.setValue(static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 2)),
+    //                     static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 2)),
+    //                     static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 2)));
+
+    //     double roll ; double pitch ; double yaw;
+    //     tf_rotation.getEulerYPR(yaw,pitch,roll);
+    //     tf2::Quaternion q_rotation;
+    //     if(pitch>=0){q_rotation.setRPY(0.,0.,pitch - M_PI/2);}
+    //     else{q_rotation.setRPY(0.,0.,pitch + M_PI/2);}
+    //     q_rotation.normalize();
+
+    //     stair_pose_->orientation = tf2::toMsg(q_rotation);
+    // //     RCLCPP_INFO(this->get_logger(),
+    // //                 "Received Pose message:\n"
+    // //                 "Position (x, y, z): %.2f, %.2f, %.2f\n"
+    // //                 "Orientation (x, y, z, w): %.2f, %.2f, %.2f, %.2f",
+    // //                 stair_pose_->position.x, stair_pose_->position.y, stair_pose_->position.z,
+    // //                 stair_pose_->orientation.x, stair_pose_->orientation.y, stair_pose_->orientation.z, stair_pose_->orientation.w);
+    // }
+
+    geometry_msgs::msg::Quaternion StairModeling::getStairOrientation(const Stair& stair){
+                geometry_msgs::msg::Pose pose;
+
+
+        Plane level_plane = stair.Planes_[level_index_];
 
         tf2::Matrix3x3 tf_rotation;
         tf2::Quaternion tf_quaternion;
         geometry_msgs::msg::Quaternion ros_quaternion;
-        tf_rotation.setValue(static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 2)),
-                        static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 2)),
-                        static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 2)));
+        tf_rotation.setValue(static_cast<double>(level_plane.plane_dir_(0, 0)), static_cast<double>(level_plane.plane_dir_(0, 1)), static_cast<double>(level_plane.plane_dir_(0, 2)),
+                        static_cast<double>(level_plane.plane_dir_(1, 0)), static_cast<double>(level_plane.plane_dir_(1, 1)), static_cast<double>(level_plane.plane_dir_(1, 2)),
+                        static_cast<double>(level_plane.plane_dir_(2, 0)), static_cast<double>(level_plane.plane_dir_(2, 1)), static_cast<double>(level_plane.plane_dir_(2, 2)));
 
         double roll ; double pitch ; double yaw;
         tf_rotation.getEulerYPR(yaw,pitch,roll);
@@ -578,14 +632,10 @@ namespace zion
         else{q_rotation.setRPY(0.,0.,pitch + M_PI/2);}
         q_rotation.normalize();
 
-        stair_pose_->orientation = tf2::toMsg(q_rotation);
-    //     RCLCPP_INFO(this->get_logger(),
-    //                 "Received Pose message:\n"
-    //                 "Position (x, y, z): %.2f, %.2f, %.2f\n"
-    //                 "Orientation (x, y, z, w): %.2f, %.2f, %.2f, %.2f",
-    //                 stair_pose_->position.x, stair_pose_->position.y, stair_pose_->position.z,
-    //                 stair_pose_->orientation.x, stair_pose_->orientation.y, stair_pose_->orientation.z, stair_pose_->orientation.w);
+        ros_quaternion = tf2::toMsg(q_rotation);
+        return ros_quaternion;
     }
+
 
     // Not in use for now
     void StairModeling::setStairTf()
@@ -648,6 +698,115 @@ namespace zion
         stair_pub_->publish(stair_stamped_msg);
     }
 
+    void StairModeling::publishStair(const Stair& stair,
+                            const std::string& cloud_frame,
+                            rclcpp::Time& now)
+    {   
+        zion_msgs::msg::StairStamped stair_stamped_msg; //with or without ::msg ?
+        zion_msgs::msg::Stair stair_msg;
+        
+        // declare stair_stamped_msg
+        stair_stamped_msg.header.frame_id = cloud_frame;
+        stair_stamped_msg.header.stamp = now;
+
+        // declare stair_msg
+        stair_stamped_msg.stair.id = stair.type_;
+        stair_stamped_msg.stair.distance = stair.step_distance_;
+        stair_stamped_msg.stair.height = stair.step_height_;
+        stair_stamped_msg.stair.angle = stair.step_angle_;
+        stair_stamped_msg.stair.length = stair.step_length_;
+        stair_stamped_msg.stair.width = stair.step_width_;
+        stair_stamped_msg.stair.pose = stair.stair_pose_; /////////////// change it
+
+        stair_pub_->publish(stair_stamped_msg);
+    }
+
+    void StairModeling::publishPlanesHulls(const std::vector<Plane>& planes,
+                                const std::string& cloud_frame,
+                                rclcpp::Time& now)
+    {
+        geometry_msgs::msg::Point point;
+        std_msgs::msg::ColorRGBA point_color;
+        visualization_msgs::msg::MarkerArray ma;
+
+        for (size_t i = 0; i < planes.size(); i++){
+
+            visualization_msgs::msg::Marker marker;
+            marker.header.frame_id = cloud_frame;
+            marker.header.stamp = this->get_clock()->now();
+            marker.ns = "hull_" + std::to_string(i);
+            marker.id = i;
+            marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+            marker.action = visualization_msgs::msg::Marker::ADD;
+            marker.pose.position.x = 0;
+            marker.pose.position.y = 0;
+            marker.pose.position.z = 0;
+            marker.pose.orientation.x = 0.0;
+            marker.pose.orientation.y = 0.0;
+            marker.pose.orientation.z = 0.0;
+            marker.pose.orientation.w = 1.0;
+            marker.scale.x = 0.02;
+            marker.scale.y = 0.02;
+            marker.scale.z = 0.02;
+            marker.color.a = 1.0;
+
+            const int nColor = i % (colors_.size()/3);
+            const double r = colors_[nColor*3]*255.0;
+            const double g = colors_[nColor*3+1]*255.0;
+            const double b = colors_[nColor*3+2]*255.0;
+            marker.points.reserve(planes[i].hull_->points.size());
+            marker.colors.reserve(planes[i].hull_->points.size());
+
+            for (size_t j = 1; j < planes[i].hull_->points.size(); j++){
+            point.x = planes[i].hull_->points[j-1].x;
+            point.y = planes[i].hull_->points[j-1].y;
+            point.z = planes[i].hull_->points[j-1].z;
+            point_color.r = r;
+            point_color.g = g;
+            point_color.b = b;
+            point_color.a = 1.0;
+            marker.colors.push_back(point_color);
+            marker.points.push_back(point);
+
+            point.x = planes[i].hull_->points[j].x;
+            point.y = planes[i].hull_->points[j].y;
+            point.z = planes[i].hull_->points[j].z;
+            point_color.r = r;
+            point_color.g = g;
+            point_color.b = b;
+            point_color.a = 1.0;
+            marker.colors.push_back(point_color);
+            marker.points.push_back(point);
+            }
+
+            // start to end line:
+            point.x = planes[i].hull_->points[0].x;
+            point.y = planes[i].hull_->points[0].y;
+            point.z = planes[i].hull_->points[0].z;
+            point_color.r = r;
+            point_color.g = g;
+            point_color.b = b;
+            point_color.a = 1.0;
+            marker.colors.push_back(point_color);
+            marker.points.push_back(point);
+
+            point.x = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].x;
+            point.y = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].y;
+            point.z = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].z;
+            point_color.r = r;
+            point_color.g = g;
+            point_color.b = b;
+            point_color.a = 1.0;
+            marker.colors.push_back(point_color);
+            marker.points.push_back(point);
+
+            marker.frame_locked = false;
+            ma.markers.push_back(marker);
+        }
+
+        hull_marker_array_pub_->publish(ma);
+
+    }
 
     void StairModeling::publishHullsAsMarkerArray(const std::string& cloud_frame)
     {
@@ -736,14 +895,26 @@ namespace zion
         }
     }
 
+    void StairModeling::publishStairPose(const geometry_msgs::msg::Pose& pose,
+                                        const std::string &cloud_frame,
+                                        rclcpp::Time& now)
+    {
+        geometry_msgs::msg::PoseStamped pose_stamped;
+        pose_stamped.header.frame_id = cloud_frame;
+        pose_stamped.header.stamp = now;
+        pose_stamped.pose = pose;
+        pose_pub_->publish(pose_stamped);
+    }
+
     void StairModeling::publishStairPose(const std::string &cloud_frame)
     {
         geometry_msgs::msg::PoseStamped pose_stamped;
         pose_stamped.header.frame_id = cloud_frame;
-        pose_stamped.header.stamp = this->get_clock()->now();;
-        pose_stamped.pose = *stair_pose_;
+        pose_stamped.header.stamp = this->get_clock()->now();
+        pose_stamped.pose = detected_stair_filtered_.stair_pose_;
         pose_pub_->publish(pose_stamped);
     }
+
 
 
     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
@@ -763,7 +934,7 @@ namespace zion
                 base_projected2camera = tf_buffer_->lookupTransform(
                     output_frame_, input_frame_,
                     tf2::TimePointZero,
-                    50ms);
+                    10ms);
 
                 // Convert ROS transform to Eigen transform
                 c2cp = tf2::transformToEigen(base_projected2camera);
@@ -791,6 +962,7 @@ namespace zion
 
 
                 // Convert processed PCL point cloud to ROS message
+                // Publish pointcloud msg frequently
                 pcl::toROSMsg(*cloud_, *pcl_buffer_);
                 pcl_buffer_->header.stamp = this->get_clock()->now();
                 pcl_buffer_->header.frame_id = output_frame_;
@@ -819,24 +991,47 @@ namespace zion
                         is_valid_candidate = checkForValidCandidate(Stair_);
                         RCLCPP_INFO_STREAM(get_logger(),"checkForValidCandidate! is_valid_candidate = " 
                                                         << is_valid_candidate);
-
                         }
 
                     // if its true candidate apply get the stair pose and filter the stairs detections
+                    // filtering over all iterations (not only when acquiring candidates (more then 1 plane)) 
                     stairDetectionFilter(Stair_, is_valid_candidate);
 
-
+                    rclcpp::Time now = this->get_clock()->now();
                     if(stair_detected_){
 
                     // if stair detected set the stair instance and compute geometric parameters
                         // setStairTf();
                         // Publish the processed point cloud and custom msgs
                         RCLCPP_INFO_STREAM(this->get_logger(),"publish!!!!!! ");
-                        getStairPose();
-                        publishHullsAsMarkerArray(output_frame_);
-                        publishStairPose(output_frame_);
-                        publishStair(output_frame_);
+                        // getStairPose();
+                        
+
+                        
+                        // publish stair hulls as marker array
+                        publishPlanesHulls(detected_stair_filtered_.Planes_,
+                                            output_frame_,
+                                            now); 
+
+                        // publish stair params
+                        publishStair(detected_stair_filtered_,
+                                            output_frame_,
+                                            now); 
+                        
+                        // publish detected_stair pose
+                        publishStairPose(detected_stair_filtered_.stair_pose_,
+                                            output_frame_,
+                                            now); 
+
                     }
+                    else if (Planes_.size()==1) //just plane detected
+                    {
+                        publishPlanesHulls(Planes_,
+                                            output_frame_,
+                                            now); 
+                    }
+                    
+                    
                 }
             }
             catch (const tf2::TransformException & ex) {
@@ -851,107 +1046,6 @@ namespace zion
             }
         }
     }
-
-
-    // void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
-    // {
-    //     // RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
-
-    //     reset();
-
-
-    //             // Convert ROS point cloud message to PCL point cloud
-    //             pcl::fromROSMsg(*pcl_msg, *cloud_);
-
-    //             // RANSAC-based plane segmentation
-    //             // cloud_ = output_cloud;
-    //             getPlanes(cloud_);
-
-    //             if(!planes_empty_){
-    //                 // find the floor plane
-                    
-    //                 findFloor();
-    //                 if(Planes_.size()>1){getStair();}
-    //                 checkForValidStair();
-
-    //                 // if stair detected set the stair instance and compute geometric parameters
-    //                 if(stair_detected_){
-    //                     // getStair();
-    //                     // setStairTf();
-    //                     getStairPose();
-    //                     // Publish the processed point cloud and custom msgs
-    //                     publishHullsAsMarkerArray(output_frame_);
-    //                     publishStairPose(output_frame_);
-    //                     publishStair(output_frame_);
-    //                 }
-    //             }
-
-    //         // debug msg
-    //         if(debug_){
-    //             printDebug();
-    //         }
-        
-    // }
-
-    //     void StairModeling::pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
-    // {
-    //     // RCLCPP_INFO(get_logger(),"Pcl msg recieved!");
-
-    //     reset();
-
-    //     geometry_msgs::msg::TransformStamped base_projected2camera;
-
-    //     // Check if transformation between frames is available
-    //     if (tf_buffer_->canTransform(output_frame_, input_frame_, tf2::TimePointZero))
-    //     {
-    //         try {
-    //             // Lookup for the transformation
-    //             base_projected2camera = tf_buffer_->lookupTransform(
-    //                 output_frame_, input_frame_,
-    //                 tf2::TimePointZero,
-    //                 50ms);
-
-    //             // Convert ROS transform to Eigen transform
-    //             c2cp = tf2::transformToEigen(base_projected2camera);
-
-    //             // Initialize point clouds
-    //             pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
-    //             // pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
-
-    //             // Convert ROS point cloud message to PCL point cloud
-    //             pcl::fromROSMsg(*pcl_msg, *input_cloud);
-
-    //             // Process the input cloud
-    //             Utilities::voxelizingDownsample(input_cloud, input_cloud,
-    //                                             leaf_size_xy_,leaf_size_z_);
-
-    //             Utilities::transformCloud(c2cp,input_cloud,input_cloud);
-
-    //             Utilities::cropping(input_cloud, cloud_,
-    //                             min_x_,max_x_,
-    //                             min_y_,max_y_,
-    //                             min_z_,max_z_);
-
-    //             // Convert processed PCL point cloud to ROS message
-    //             pcl::toROSMsg(*cloud_, *pcl_buffer_);
-    //             pcl_buffer_->header.stamp = this->get_clock()->now();
-    //             pcl_buffer_->header.frame_id = output_frame_;
-    //             pcl_pub_->publish(*pcl_buffer_);
-
-                
-    //         }
-    //         catch (const tf2::TransformException & ex) {
-    //             RCLCPP_INFO(
-    //             this->get_logger(), "Could not transform %s to %s: %s",
-    //             input_frame_.c_str(), output_frame_.c_str(), ex.what());
-    //             return;
-    //         }
-    //         // debug msg
-    //         if(debug_){
-    //             printDebug();
-    //         }
-    //     }
-    // }
 
 } // namespace
 
