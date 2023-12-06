@@ -28,13 +28,26 @@
 
 // Parameters for height of the stairs, given by the regulations:
 const float k_height_min = 0.07f;  // Min height 
-const float k_height_max = 1.f;    //1.f; 0.2f Max height 
+const float k_height_max = 0.25f;    //1.f; 0.2f Max height 
 // const float k_length_min = 0.1f;   // Min length is 20 cm (no max length)
 const float k_area_min = 0.2f; // Min step area
 
 class Stair
 {
 public:
+
+    Stair(std::vector<Plane> planes){
+            step_distance_ = 0.;
+            step_height_ = 0.;
+            step_width_ = 0.;
+            step_length_ = 0.;
+            step_angle_ = 0.;
+            Planes_ = planes;
+            for (int i=0; i< static_cast<int>(planes.size()); i++){
+                Planes_.push_back(planes[i]);
+            } 
+        }
+
 
     /**
      * @brief Constructor that initializes the stair with given planes.
@@ -80,12 +93,17 @@ public:
      * @param source_plane_h The height of the source plane.
      * @param target_plane_h The height of the target plane.
      */
+
     static bool checkValidHeight(float source_plane_h, float target_plane_h);
 
     geometry_msgs::msg::Quaternion getStairOrientation();
+    void setStairOrientation();
 
-    geometry_msgs::msg::Quaternion getStairOrientation(const Stair& stair);
+    geometry_msgs::msg::Pose getStairPose();
+    void setStairPose();
 
+    geometry_msgs::msg::Pose getStairPoseInMap();
+    void setStairPoseInMap();
 
     // Members:
     std::vector<Plane> Planes_; // Step candidates given by the detection process
@@ -95,8 +113,9 @@ public:
     float step_height_; // Height of the step
     float step_distance_; // Distance between steps
     float step_angle_; // Angle of the stair
-    pcl::PointXYZRGB transition_point_ ; // the transition point between floor and level
+
     geometry_msgs::msg::Pose stair_pose_; ///< Pose of the detected stair.
+    geometry_msgs::msg::Pose stair_pose_in_map_; ///< Pose of the detected stair in map frame.
 
 
 private:

@@ -242,15 +242,15 @@ namespace zion
 
         double calculatePositionError(const Stair& stair1, const Stair& stair2);
 
-        Stair avgStair(Stair& stair1, Stair& stair2);
-
+        Stair updateStair(Stair& stair1, Stair& stair2);
 
         // Not in use. 
         void calcPlaneSlope();
         void setStairTf();
 
+
+
     private:
-        std::vector<double> colors_; ///< Vector storing colors for visualization.
 
         // Subscribers
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_sub_; ///< Subscription to the point cloud topic.
@@ -281,7 +281,9 @@ namespace zion
         std::vector<int> stairs_counts_arr_; ///< counts of valid candidates for filtering
 
         // Transformation matrix.
-        Eigen::Affine3d c2cp;
+        Eigen::Affine3d c2bp;
+        Eigen::Affine3d m2bp;
+        Eigen::Affine3d bp2m;
 
         // ROS parameters
         // Parameters for voxel filtering
@@ -312,13 +314,15 @@ namespace zion
         std::string input_point_cloud_topic_; ///< Topic name for input point cloud.
         std::string filtered_point_cloud_topic_; ///< Topic name for filtered point cloud.
 
+        std::string map_frame_; ///< Name of the output frame for the processed data.
         std::string input_frame_; ///< Name of the input frame for the processed data.
         std::string output_frame_; ///< Name of the output frame for the processed data.
 
         int filter_min_limit_; // can put as param
         int filter_max_limit_; // maximum counts that stair can get,can put as param
         double pos_err_thresh_;  // can put as param
-
+        double w_; // weighted sum factor 
+        
         bool planes_empty_; ///< No planes are found. True == there is no planes found from segmentation.
         bool debug_; ///< Flag for debugging mode.
         std::string debug_msg_; ///< Message string for debugging.
