@@ -36,16 +36,31 @@ class Stair
 {
 public:
 
-    Stair(std::vector<Plane> planes){
-            step_distance_ = 0.;
-            step_height_ = 0.;
-            step_width_ = 0.;
-            step_length_ = 0.;
-            step_angle_ = 0.;
-            Planes_ = planes;
+    Stair( int type, // 0 = upwards, 1 = downwards
+            float step_width, // Width of the step
+            float step_length, // Length of the step
+            float step_height, // Height of the step
+            float step_distance, // Distance between steps
+            float step_angle,
+            std::vector<Plane> planes){
+
+            type_ = type;
+            step_width_ = step_width;
+            step_length_ = step_length;
+            step_distance_ = step_distance;
+            step_height_ = step_height;
+            step_angle_ = step_angle;
+
             for (int i=0; i< static_cast<int>(planes.size()); i++){
                 Planes_.push_back(planes[i]);
-            } 
+            }
+            
+            // TODO // sort planes
+            
+
+            // TODO // setPose
+            // setPose <- set orientation inside
+
         }
 
 
@@ -59,7 +74,7 @@ public:
             step_width_ = 0.;
             step_length_ = 0.;
             step_angle_ = 0.;
-            Planes_ = planes;
+
             for (int i=0; i< static_cast<int>(planes.size()); i++){
                 Planes_.push_back(planes[i]);
             } 

@@ -569,20 +569,24 @@ namespace zion
     void StairModeling::getStair()
     {
         // init stair
-        Stair_ = Stair(Planes_);  
-        float floor_h = Stair_.Planes_[floor_index_].plane_coefficients_->values[3];
-        float level_h = Stair_.Planes_[level_index_].plane_coefficients_->values[3];
+        int type; // 0 = upwards; 1 = downwards
+        float step_width; // Width of the step
+        float step_length; // Length of the step
+        float step_height; // Height of the step
+        float step_distance; // Distance between steps
+        float step_angle;
+
+        float floor_h = Planes_[floor_index_].plane_coefficients_->values[3];
+        float level_h = Planes_[level_index_].plane_coefficients_->values[3];
         
         // set the stair type based on the planes height
         // if floor height is high than the level height (farther from the camera) -> stair ascending
         if (floor_h>level_h){
-            Stair_.type_ = 0; // 0 = stair is upward
-            Stair_.step_length_ = Stair_.Planes_[level_index_].length_;
-            Stair_.step_width_ = Stair_.Planes_[level_index_].width_;
+            type = 0;
 
             // Stair_.stair_pose_.pose.position.y = Stair_.Planes_[level_index_].center_.y;
             // Stair_.stair_pose_.pose.position.z = Stair_.Planes_[level_index_].center_.z;
-            Stair_.stair_pose_.position.y = Stair_.Planes_[level_index_].center_.y;
+            Stair_.stair_pose_.position.y = Planes_[level_index_].center_.y;
             Stair_.stair_pose_.position.z = Stair_.Planes_[level_index_].center_.z;
 
             // If upwards, calculate the distance by finding the average x-coordinate
