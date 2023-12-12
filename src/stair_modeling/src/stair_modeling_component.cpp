@@ -76,18 +76,6 @@ namespace zion
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock(),tf2::durationFromSec(10));
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-
-
-        // Initialize to an invalid index
-        floor_index_ = -1;  
-        level_index_ = -1;
-
-        planes_empty_ = true;
-
-
-        // for filtering
-        stairs_arr_ = {};
-        stairs_counts_arr_ = {};
         stair_detected_ = false;
 
     }
@@ -225,8 +213,6 @@ namespace zion
     {
         Planes_.clear();
         debug_msg_ = "debug";
-        floor_index_ = -1;  
-        level_index_ = -1;
         planes_empty_ = true;
     }
 
@@ -288,7 +274,8 @@ namespace zion
                         else{
                             // check for the height validation
                             // if height difference is in valid range , pushback the second plane
-                            if (Stair::checkValidHeight(Planes_[0].plane_coefficients_->values[3],plane_coefficients->values[3])){
+                            float diff = std::abs(Planes_[0].plane_coefficients_->values[3] - plane_coefficients->values[3]);
+                            if (k_height_min <= diff && diff <= k_height_max){
                                 Plane plane = Plane(plane_points_clustered,plane_coefficients);
                                 plane.calcPlaneSlope();
                                 Planes_.push_back(plane);
@@ -350,7 +337,7 @@ namespace zion
 
     void StairModeling::findFloor() 
     {
-
+            size_t floor_index  = -1;
             // If there is more then 1 planes.
             if (Planes_.size()>1){
 
@@ -378,23 +365,18 @@ namespace zion
                         ///// continueee from here
                         if (avg_x < min_avg_x) {
                             min_avg_x = avg_x;
-                            floor_index_ = static_cast<int>(i);
+                            floor_index = i;
                         }
                     }
-                    if (floor_index_==0){ level_index_ = 1;}
-                    else{ level_index_ = 0;}
             }
             // In case of single plane -> It is the floor!
             else{
-                floor_index_=0;
+                floor_index = 0;
             }
-        
+
         // set planes type 
-        if (floor_index_!=-1){Planes_[floor_index_].type_ = 0;}
-        if (level_index_!=-1){Planes_[level_index_].type_ = 1;}
-        
-        // for debug
-        debug_msg_ = debug_msg_ + "\nFloor index: " + std::to_string(floor_index_) + " | Level index: " + std::to_string(level_index_); 
+        Planes_[floor_index].type_ = 0; // set as floor
+
     }
 
     bool StairModeling::checkForValidCandidate(Stair& stair)
@@ -429,23 +411,7 @@ namespace zion
         return error;
     }
 
-    //     // TODO // avg properties
-    //             // avg the map pose only
-    //     stair1.stair_pose_in_map_.position.x = ((1-w_)*stair1.stair_pose_in_map_.position.x + w_*stair2.stair_pose_in_map_.position.x);
-    //     stair1.stair_pose_in_map_.position.y = ((1-w_)*stair1.stair_pose_in_map_.position.y + w_*stair2.stair_pose_in_map_.position.y);
-    //     stair1.stair_pose_in_map_.position.z = ((1-w_)*stair1.stair_pose_in_map_.position.z + w_*stair2.stair_pose_in_map_.position.z);
 
-    //     stair1.stair_pose_in_map_.orientation = stair2.stair_pose_in_map_.orientation; // for now
-        
-    //     stair1.step_distance_ = ((1-w_)*stair1.step_distance_ + w_*stair2.step_distance_);
-    //     stair1.step_height_ = ((1-w_)*stair1.step_height_ + w_*stair2.step_height_);
-    //     stair1.step_width_ = ((1-w_)*stair1.step_width_ + w_*stair2.step_width_);
-    //     stair1.step_length_ = ((1-w_)*stair1.step_length_ + w_*stair2.step_length_);
-    //     stair1.step_angle_ = ((1-w_)*stair1.step_angle_ + w_*stair2.step_angle_);
-    //     stair1.Planes_ = stair2.Planes_;
-
-    //     return stair1;
-    
     Stair StairModeling::updateStair(Stair& stair1, Stair& stair2)
     {
         // TODO // avg properties
@@ -555,7 +521,7 @@ namespace zion
 
         if (max_count >= filter_min_limit_){
 
-                detect_stair = stairs_buffer[max_count_i];
+                detect_stair = stairs_buffer[max_count_i].get();
                 
                 RCLCPP_INFO_STREAM(this->get_logger(),"stair detected index: " << max_count_i);
                 return true;
@@ -566,160 +532,9 @@ namespace zion
         }
     }
 
-    void StairModeling::getStair()
+    void StairModeling::setStair()
     {
-        // init stair
-        int type; // 0 = upwards; 1 = downwards
-        float step_width; // Width of the step
-        float step_length; // Length of the step
-        float step_height; // Height of the step
-        float step_distance; // Distance between steps
-        float step_angle;
-
-        float floor_h = Planes_[floor_index_].plane_coefficients_->values[3];
-        float level_h = Planes_[level_index_].plane_coefficients_->values[3];
-        
-        // set the stair type based on the planes height
-        // if floor height is high than the level height (farther from the camera) -> stair ascending
-        if (floor_h>level_h){
-            type = 0;
-
-            // Stair_.stair_pose_.pose.position.y = Stair_.Planes_[level_index_].center_.y;
-            // Stair_.stair_pose_.pose.position.z = Stair_.Planes_[level_index_].center_.z;
-            Stair_.stair_pose_.position.y = Planes_[level_index_].center_.y;
-            Stair_.stair_pose_.position.z = Stair_.Planes_[level_index_].center_.z;
-
-            // If upwards, calculate the distance by finding the average x-coordinate
-            // of the points below yThreshold in the level plane's cloud
-            float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[level_index_].cloud_, y_threshold_, x_neighbors_, true);
-            Stair_.stair_pose_.position.x = x_distance;
-            // Stair_.stair_pose_.pose.position.x = x_distance;
-
-            debug_msg_ = debug_msg_ + "\nStair type: Up";
-            Stair_.step_distance_ = x_distance;
-
-        }else{ // -> stair descending
-            debug_msg_ = debug_msg_ + "\nStair type: Down";
-            Stair_.type_ = 1; // 1 = downwards
-            Stair_.step_length_ = Stair_.Planes_[floor_index_].length_;
-            Stair_.step_width_ = Stair_.Planes_[floor_index_].width_;
-
-            // Stair_.stair_pose_.pose.position.y = Stair_.Planes_[floor_index_].center_.y;
-            // Stair_.stair_pose_.pose.position.z = Stair_.Planes_[floor_index_].center_.z;
-            Stair_.stair_pose_.position.y = Stair_.Planes_[floor_index_].center_.y;
-            Stair_.stair_pose_.position.z = Stair_.Planes_[floor_index_].center_.z;
-
-            // compute distance
-            // If downwards, calculate the distance by finding the average x-coordinate
-            // of the points below yThreshold in the second plane's cloud
-            float x_distance = Utilities::findAvgXForPointsBelowYThreshold(Planes_[floor_index_].cloud_, y_threshold_, x_neighbors_, false);
-            // Stair_.stair_pose_.pose.position.x = x_distance;
-            Stair_.stair_pose_.position.x = x_distance;
-
-            Stair_.step_distance_ = x_distance;
-        }
-
-        // compute stair orientation
-        Stair_.stair_pose_.orientation = getStairOrientation(Stair_);
-        // Stair_.getStairOrientation();
-
-
-        // compute height
-        Stair_.step_height_ = fabs(floor_h-level_h);
-        // compute yaw angle w.r.t camera heading
-        // Stair_.step_angle_ = Utilities::rad2deg(std::atan2(Stair_.stair_pose_.pose.position.y,
-        //                                                     Stair_.stair_pose_.pose.position.x));
-        Stair_.step_angle_ = Utilities::rad2deg(std::atan2(Stair_.stair_pose_.position.y,
-                                                            Stair_.stair_pose_.position.x));                                             
-
-        // debug
-        debug_msg_ = debug_msg_ + "\nHeight is:  " + std::to_string(Stair_.step_height_ );
-        debug_msg_ = debug_msg_ + "\nDistance is:  " + std::to_string(Stair_.step_distance_);
-    }
-
-
-    // void StairModeling::getStairPose()
-    // {
-    //     geometry_msgs::msg::Pose pose;
-
-    //     stair_pose_->position.x = detected_stair_filtered_.transition_point_.x;
-    //     stair_pose_->position.y = detected_stair_filtered_.transition_point_.y;
-    //     stair_pose_->position.z = detected_stair_filtered_.transition_point_.z;
-
-    //     tf2::Matrix3x3 tf_rotation;
-    //     tf2::Quaternion tf_quaternion;
-    //     geometry_msgs::msg::Quaternion ros_quaternion;
-    //     tf_rotation.setValue(static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(0, 2)),
-    //                     static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(1, 2)),
-    //                     static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 0)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 1)), static_cast<double>(detected_stair_filtered_.Planes_[level_index_].plane_dir_(2, 2)));
-
-    //     double roll ; double pitch ; double yaw;
-    //     tf_rotation.getEulerYPR(yaw,pitch,roll);
-    //     tf2::Quaternion q_rotation;
-    //     if(pitch>=0){q_rotation.setRPY(0.,0.,pitch - M_PI/2);}
-    //     else{q_rotation.setRPY(0.,0.,pitch + M_PI/2);}
-    //     q_rotation.normalize();
-
-    //     stair_pose_->orientation = tf2::toMsg(q_rotation);
-    // //     RCLCPP_INFO(this->get_logger(),
-    // //                 "Received Pose message:\n"
-    // //                 "Position (x, y, z): %.2f, %.2f, %.2f\n"
-    // //                 "Orientation (x, y, z, w): %.2f, %.2f, %.2f, %.2f",
-    // //                 stair_pose_->position.x, stair_pose_->position.y, stair_pose_->position.z,
-    // //                 stair_pose_->orientation.x, stair_pose_->orientation.y, stair_pose_->orientation.z, stair_pose_->orientation.w);
-    // }
-
-    geometry_msgs::msg::Quaternion StairModeling::getStairOrientation(const Stair& stair){
-
-        Plane level_plane = stair.Planes_[level_index_];
-
-        tf2::Matrix3x3 tf_rotation;
-        tf2::Quaternion tf_quaternion;
-        geometry_msgs::msg::Quaternion ros_quaternion;
-        tf_rotation.setValue(static_cast<double>(level_plane.plane_dir_(0, 0)), static_cast<double>(level_plane.plane_dir_(0, 1)), static_cast<double>(level_plane.plane_dir_(0, 2)),
-                        static_cast<double>(level_plane.plane_dir_(1, 0)), static_cast<double>(level_plane.plane_dir_(1, 1)), static_cast<double>(level_plane.plane_dir_(1, 2)),
-                        static_cast<double>(level_plane.plane_dir_(2, 0)), static_cast<double>(level_plane.plane_dir_(2, 1)), static_cast<double>(level_plane.plane_dir_(2, 2)));
-
-        double roll ; double pitch ; double yaw;
-        tf_rotation.getEulerYPR(yaw,pitch,roll);
-        tf2::Quaternion q_rotation;
-        if(pitch>=0){q_rotation.setRPY(0.,0.,pitch - M_PI/2);}
-        else{q_rotation.setRPY(0.,0.,pitch + M_PI/2);}
-        q_rotation.normalize();
-
-        ros_quaternion = tf2::toMsg(q_rotation);
-        return ros_quaternion;
-    }
-
-
-    // Not in use for now
-    void StairModeling::setStairTf()
-    {
-        std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
-        tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-        geometry_msgs::msg::TransformStamped transformStamped;
-
-        // set transform msg
-        tf2::Transform tf2_transform;
-
-        tf2_transform.setIdentity();    
-        transformStamped.header.stamp = this->get_clock()->now();
-        transformStamped.header.frame_id = output_frame_;
-        transformStamped.child_frame_id = "stair";
-
-        //translation
-        transformStamped.transform.translation.x = Stair_.transition_point_.x;
-        transformStamped.transform.translation.y = Stair_.transition_point_.y;
-        transformStamped.transform.translation.z = Stair_.transition_point_.z;
-
-        //rotation
-        tf2::Quaternion q_rotation;
-        q_rotation.setRPY(0.,0.,0.);
-        q_rotation.normalize();
-
-        transformStamped.transform.rotation = tf2::toMsg(q_rotation);
-        // sending transform
-        tf_broadcaster->sendTransform(transformStamped);
+        Stair_ = Stair(Planes_);
     }
 
     // Not in use
@@ -730,17 +545,17 @@ namespace zion
         printDebug();
     }
 
+
     void StairModeling::publishStair(const Stair& stair,
                             const std::string& cloud_frame,
                             rclcpp::Time& now)
     {   
         zion_msgs::msg::StairStamped stair_stamped_msg; //with or without ::msg ?
         zion_msgs::msg::Stair stair_msg;
-        
+
         // declare stair_stamped_msg
         stair_stamped_msg.header.frame_id = cloud_frame;
         stair_stamped_msg.header.stamp = now;
-
 
         // declare stair_msg
         stair_stamped_msg.stair.id = stair.type_;
@@ -754,6 +569,142 @@ namespace zion
         stair_pub_->publish(stair_stamped_msg);
     }
 
+
+    // void StairModeling::publishPlanesHulls(const std::vector<Plane>& planes,
+    //                             const std::string& cloud_frame,
+    //                             rclcpp::Time& now)
+    // {   
+    //     geometry_msgs::msg::Point point;
+    //     std_msgs::msg::ColorRGBA point_color;
+    //     visualization_msgs::msg::MarkerArray ma;
+    //     visualization_msgs::msg::MarkerArray temp;
+
+    //     const std::vector<double> floor_color = {0.,0.,255.}; ///< Vector storing colors for visualization.
+        
+    //     const std::vector<double> level_color = {0.,255.,0.}; ///< Vector storing colors for visualization.
+
+    //     for (size_t i = 0; i < planes.size(); i++){
+
+    //         double r;
+    //         double g;
+    //         double b;
+    //         std::string ns;
+
+    //         if(planes[i].type_==0){
+    //                 ns = "Floor" ;
+    //                 r = floor_color[0]/255.;
+    //                 g = floor_color[1]/255.;
+    //                 b = floor_color[2]/255.;
+    //         }else{
+    //                 ns = "Level";
+    //                 r = level_color[0]/255.;
+    //                 g = level_color[1]/255.;
+    //                 b = level_color[2]/255.;
+    //         }
+
+    //         visualization_msgs::msg::Marker marker;
+    //         marker.header.frame_id = cloud_frame;
+    //         marker.header.stamp = now;
+    //         marker.ns = "ns" + i;
+    //         marker.id = i;
+    //         marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+    //         marker.action = visualization_msgs::msg::Marker::ADD;
+    //         marker.pose.position.x = 0;
+    //         marker.pose.position.y = 0;
+    //         marker.pose.position.z = 0;
+    //         marker.pose.orientation.x = 0.0;
+    //         marker.pose.orientation.y = 0.0;
+    //         marker.pose.orientation.z = 0.0;
+    //         marker.pose.orientation.w = 1.0;
+    //         marker.scale.x = 0.03;
+    //         marker.scale.y = 0.03;
+    //         marker.scale.z = 0.03;
+    //         marker.color.a = 1.0;
+
+    //         marker.points.reserve(planes[i].hull_->points.size());
+    //         marker.colors.reserve(planes[i].hull_->points.size());
+
+    //         for (size_t j = 1; j < planes[i].hull_->points.size(); j++){
+    //             point.x = planes[i].hull_->points[j-1].x;
+    //             point.y = planes[i].hull_->points[j-1].y;
+    //             point.z = planes[i].hull_->points[j-1].z;
+    //             point_color.r = 1.;
+    //             point_color.g = 0.5;
+    //             point_color.b = 0.3;
+    //             point_color.a = 1.0;
+    //             marker.colors.push_back(point_color);
+    //             marker.points.push_back(point);
+    //         }
+
+    //         // start to end line:
+    //         point.x = planes[i].hull_->points[0].x;
+    //         point.y = planes[i].hull_->points[0].y;
+    //         point.z = planes[i].hull_->points[0].z;
+    //         point_color.r = 1.;
+    //         point_color.g = 0.5;
+    //         point_color.b = 0.3;
+    //         point_color.a = 1.0;
+    //         marker.colors.push_back(point_color);
+    //         marker.points.push_back(point);
+
+    //         point.x = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].x;
+    //         point.y = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].y;
+    //         point.z = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].z;
+    //         point_color.r = 1.;
+    //         point_color.g = 0.5;
+    //         point_color.b = 0.3;
+    //         point_color.a = 1.0;
+    //         point_color.a = 1.0;
+    //         marker.colors.push_back(point_color);
+    //         marker.points.push_back(point);
+
+    //         marker.frame_locked = false;
+
+    //         // // Create an additional marker for the label
+    //         // visualization_msgs::msg::Marker text_marker;
+    //         // text_marker.header.frame_id = cloud_frame;
+    //         // text_marker.header.stamp = now;
+    //         // text_marker.ns = ns + "_text_";
+    //         // text_marker.id = i + planes.size(); // Unique ID, different from the hull marker
+    //         // text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+    //         // text_marker.action = visualization_msgs::msg::Marker::ADD;
+
+    //         // // Position the text marker (adjust as needed)
+    //         // // For example, place it at the first point of the hull
+    //         // text_marker.pose.position.x = planes[i].hull_->points[0].x;
+    //         // text_marker.pose.position.y = planes[i].hull_->points[0].y;
+    //         // text_marker.pose.position.z = planes[i].hull_->points[0].z + 0.2; // Slightly above the hull
+
+    //         // // Set the orientation of the text marker
+    //         // text_marker.pose.orientation.x = 0.0;
+    //         // text_marker.pose.orientation.y = 0.0;
+    //         // text_marker.pose.orientation.z = 0.0;
+    //         // text_marker.pose.orientation.w = 1.0;
+
+    //         // // Set the scale (size) of the text marker
+    //         // text_marker.scale.z = 0.1; // Adjust text size as needed
+
+    //         // // Set the color of the text marker
+    //         // text_marker.color.r = 1.0;
+    //         // text_marker.color.g = 1.0;
+    //         // text_marker.color.b = 1.0;
+    //         // text_marker.color.a = 1.0;
+
+    //         // // Set the text of the text marker
+    //         // text_marker.text = ns;
+
+    //         // ma.markers->values
+    //         // Add the text marker to the MarkerArray
+    //         // ma.markers[index] = marker;
+    //         // ma.markers[index+1] = text_marker;
+    //         // ma.markers.push_back(text_marker);
+    //         ma.markers.push_back(marker);
+    //     }
+
+    //     hull_marker_array_pub_->publish(ma);
+
+    // }
+
     void StairModeling::publishPlanesHulls(const std::vector<Plane>& planes,
                                 const std::string& cloud_frame,
                                 rclcpp::Time& now)
@@ -761,54 +712,37 @@ namespace zion
         geometry_msgs::msg::Point point;
         std_msgs::msg::ColorRGBA point_color;
         visualization_msgs::msg::MarkerArray ma;
-        visualization_msgs::msg::MarkerArray temp;
 
-        const std::vector<double> floor_color = {0.,0.,255.}; ///< Vector storing colors for visualization.
-        
-        const std::vector<double> level_color = {0.,255.,0.}; ///< Vector storing colors for visualization.
+        if(planes.size()>0){
+            for (size_t i = 0; i < planes.size(); i++){
 
-        for (size_t i = 0; i < planes.size(); i++){
+                visualization_msgs::msg::Marker marker;
+                marker.header.frame_id = cloud_frame;
+                marker.header.stamp = this->get_clock()->now();
+                marker.ns = "hull_" + std::to_string(i);
+                marker.id = i;
+                marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+                marker.action = visualization_msgs::msg::Marker::ADD;
+                marker.pose.position.x = 0;
+                marker.pose.position.y = 0;
+                marker.pose.position.z = 0;
+                marker.pose.orientation.x = 0.0;
+                marker.pose.orientation.y = 0.0;
+                marker.pose.orientation.z = 0.0;
+                marker.pose.orientation.w = 1.0;
+                marker.scale.x = 0.03;
+                marker.scale.y = 0.03;
+                marker.scale.z = 0.03;
+                marker.color.a = 1.0;
 
-            double r;
-            double g;
-            double b;
-            std::string ns;
 
-            if(planes[i].type_==0){
-                    ns = "Floor" ;
-                    r = floor_color[0]/255.;
-                    g = floor_color[1]/255.;
-                    b = floor_color[2]/255.;
-            }else{
-                    ns = "Level";
-                    r = level_color[0]/255.;
-                    g = level_color[1]/255.;
-                    b = level_color[2]/255.;
-            }
+                const double r = 1.;
+                const double g = 0.5;
+                const double b = 0.3;
+                marker.points.reserve(planes[i].hull_->points.size());
+                marker.colors.reserve(planes[i].hull_->points.size());
 
-            visualization_msgs::msg::Marker marker;
-            marker.header.frame_id = cloud_frame;
-            marker.header.stamp = now;
-            marker.ns = ns;
-            marker.id = i;
-            marker.type = visualization_msgs::msg::Marker::LINE_LIST;
-            marker.action = visualization_msgs::msg::Marker::ADD;
-            marker.pose.position.x = 0;
-            marker.pose.position.y = 0;
-            marker.pose.position.z = 0;
-            marker.pose.orientation.x = 0.0;
-            marker.pose.orientation.y = 0.0;
-            marker.pose.orientation.z = 0.0;
-            marker.pose.orientation.w = 1.0;
-            marker.scale.x = 0.02;
-            marker.scale.y = 0.02;
-            marker.scale.z = 0.02;
-            marker.color.a = 1.0;
-
-            marker.points.reserve(planes[i].hull_->points.size());
-            marker.colors.reserve(planes[i].hull_->points.size());
-
-            for (size_t j = 1; j < planes[i].hull_->points.size(); j++){
+                for (size_t j = 1; j < planes[i].hull_->points.size(); j++){
                 point.x = planes[i].hull_->points[j-1].x;
                 point.y = planes[i].hull_->points[j-1].y;
                 point.z = planes[i].hull_->points[j-1].z;
@@ -818,75 +752,48 @@ namespace zion
                 point_color.a = 1.0;
                 marker.colors.push_back(point_color);
                 marker.points.push_back(point);
+
+                point.x = planes[i].hull_->points[j].x;
+                point.y = planes[i].hull_->points[j].y;
+                point.z = planes[i].hull_->points[j].z;
+                point_color.r = r;
+                point_color.g = g;
+                point_color.b = b;
+                point_color.a = 1.0;
+                marker.colors.push_back(point_color);
+                marker.points.push_back(point);
+                }
+
+                // start to end line:
+                point.x = planes[i].hull_->points[0].x;
+                point.y = planes[i].hull_->points[0].y;
+                point.z = planes[i].hull_->points[0].z;
+                point_color.r = r;
+                point_color.g = g;
+                point_color.b = b;
+                point_color.a = 1.0;
+                marker.colors.push_back(point_color);
+                marker.points.push_back(point);
+
+                point.x = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].x;
+                point.y = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].y;
+                point.z = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].z;
+                point_color.r = r;
+                point_color.g = g;
+                point_color.b = b;
+                point_color.a = 1.0;
+                marker.colors.push_back(point_color);
+                marker.points.push_back(point);
+
+                marker.frame_locked = false;
+                ma.markers.push_back(marker);
             }
 
-            // start to end line:
-            point.x = planes[i].hull_->points[0].x;
-            point.y = planes[i].hull_->points[0].y;
-            point.z = planes[i].hull_->points[0].z;
-            point_color.r = r;
-            point_color.g = g;
-            point_color.b = b;
-            point_color.a = 1.0;
-            marker.colors.push_back(point_color);
-            marker.points.push_back(point);
-
-            point.x = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].x;
-            point.y = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].y;
-            point.z = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].z;
-            point_color.r = r;
-            point_color.g = g;
-            point_color.b = b;
-            point_color.a = 1.0;
-            marker.colors.push_back(point_color);
-            marker.points.push_back(point);
-
-            marker.frame_locked = false;
-
-            // Create an additional marker for the label
-            visualization_msgs::msg::Marker text_marker;
-            text_marker.header.frame_id = cloud_frame;
-            text_marker.header.stamp = now;
-            text_marker.ns = ns + "_text_";
-            text_marker.id = i + planes.size(); // Unique ID, different from the hull marker
-            text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
-            text_marker.action = visualization_msgs::msg::Marker::ADD;
-
-            // Position the text marker (adjust as needed)
-            // For example, place it at the first point of the hull
-            text_marker.pose.position.x = planes[i].hull_->points[0].x;
-            text_marker.pose.position.y = planes[i].hull_->points[0].y;
-            text_marker.pose.position.z = planes[i].hull_->points[0].z + 0.2; // Slightly above the hull
-
-            // Set the orientation of the text marker
-            text_marker.pose.orientation.x = 0.0;
-            text_marker.pose.orientation.y = 0.0;
-            text_marker.pose.orientation.z = 0.0;
-            text_marker.pose.orientation.w = 1.0;
-
-            // Set the scale (size) of the text marker
-            text_marker.scale.z = 0.1; // Adjust text size as needed
-
-            // Set the color of the text marker
-            text_marker.color.r = 1.0;
-            text_marker.color.g = 1.0;
-            text_marker.color.b = 1.0;
-            text_marker.color.a = 1.0;
-
-            // Set the text of the text marker
-            text_marker.text = ns;
-
-            // ma.markers->values
-            // Add the text marker to the MarkerArray
-            // ma.markers[index] = marker;
-            // ma.markers[index+1] = text_marker;
-            ma.markers.push_back(text_marker);
-            ma.markers.push_back(marker);
         }
-
         hull_marker_array_pub_->publish(ma);
 
     }
+
 
 
     void StairModeling::publishStairPose(const geometry_msgs::msg::Pose& pose,
@@ -905,8 +812,6 @@ namespace zion
     {
 
         reset();
-
-
 
         Eigen::Affine3d m2bp;
         Eigen::Affine3d bp2m;
@@ -931,10 +836,6 @@ namespace zion
                     tf2::TimePointZero);//,
                     //50ms);
 
-                // map2base_projected2 = tf_buffer_->lookupTransform(
-                //     output_frame_, map_frame_,
-                //     tf2::TimePointZero,
-                //     20ms);//,
 
 
                 base_projected2map = tf_buffer_->lookupTransform(
@@ -945,13 +846,8 @@ namespace zion
 
                 // Convert ROS transform to Eigen transform
                 c2bp = tf2::transformToEigen(camera2base_projected);
-                // m2bp = tf2::transformToEigen(map2base_projected2);
-                // bp2m = m2bp.inverse();
-                // TODO // compute bp2map 
                 bp2m = tf2::transformToEigen(base_projected2map);
                 m2bp = bp2m.inverse();
-
-                
 
                 // Initialize point clouds
                 pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
@@ -981,104 +877,22 @@ namespace zion
                 pcl_buffer_->header.frame_id = output_frame_;
                 pcl_pub_->publish(*pcl_buffer_);
 
-
-
-
                 // RANSAC-based plane segmentation
                 // cloud_ = output_cloud;
                 getPlanes(cloud_);
-
-
 
                 if(!planes_empty_){
                     // find the floor plane
                     RCLCPP_INFO(get_logger(),"planes not empty!");
 
-                    
-
                     findFloor();
                     RCLCPP_INFO(get_logger(),"find floor!");
-
-                    
 
                     bool is_valid_candidate = false;
                     if(Planes_.size()>1){
                         // get the raw stair properties
-                        getStair();
-                        
-                        // Eigen::Vector3d position_bp2m = bp2m.translation();
-                        // Eigen::Quaterniond orientation_bp2m(bp2m.rotation());
-
-                        // RCLCPP_WARN_STREAM(
-                        // rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                        // "BP2M Transformation Matrix: \nPosition = (" << position_bp2m.x() << ", " << position_bp2m.y() << ", " << position_bp2m.z() << 
-                        // "), Orientation = (" << orientation_bp2m.w() << ", " << orientation_bp2m.x() << ", " << orientation_bp2m.y() << 
-                        // ", " << orientation_bp2m.z() << ")");
-
-                        Eigen::Vector3d position_m2bp = m2bp.translation();
-                        Eigen::Quaterniond orientation_m2bp(m2bp.rotation());
-
-                        RCLCPP_WARN_STREAM(
-                        rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                        "m2bp Transformation Matrix: \nPosition = (" << position_m2bp.x() << ", " << position_m2bp.y() << ", " << position_m2bp.z() << 
-                        "), Orientation = (" << orientation_m2bp.w() << ", " << orientation_m2bp.x() << ", " << orientation_m2bp.y() << 
-                        ", " << orientation_m2bp.z() << ")");
-
-                        Eigen::Vector3d position_bp2m = bp2m.translation();
-                        Eigen::Quaterniond orientation_bp2m(bp2m.rotation());
-
-                        RCLCPP_WARN_STREAM(
-                        rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                        "BP2M Transformation Matrix: \nPosition = (" << position_bp2m.x() << ", " << position_bp2m.y() << ", " << position_bp2m.z() << 
-                        "), Orientation = (" << orientation_bp2m.w() << ", " << orientation_bp2m.x() << ", " << orientation_bp2m.y() << 
-                        ", " << orientation_bp2m.z() << ")");
-
-
-                        Eigen::Affine3d pose_eigen;
-                        Eigen::Affine3d pose_in_map_eigen;
-
-                        tf2::fromMsg(Stair_.stair_pose_, pose_eigen);
-                        pose_in_map_eigen = bp2m * pose_eigen;
-
-                        Stair_.stair_pose_in_map_ = tf2::toMsg(pose_in_map_eigen);
-
-
-                        Eigen::Vector3d position = pose_eigen.translation();
-                        Eigen::Quaterniond orientation(pose_eigen.rotation());
-
-                        RCLCPP_WARN_STREAM(
-                        rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                        "Eigen Pose: \nPosition = (" << position.x() << ", " << position.y() << ", " << position.z() << 
-                        "), Orientation = (" << orientation.w() << ", " << orientation.x() << ", " << orientation.y() << 
-                        ", " << orientation.z() << ")");
-
-                        Eigen::Vector3d position_map = pose_in_map_eigen.translation();
-                        Eigen::Quaterniond orientation_map(pose_in_map_eigen.rotation());
-
-                        RCLCPP_WARN_STREAM(
-                        rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                        "Pose in Map Eigen: \nPosition = (" << position_map.x() << ", " << position_map.y() << ", " << position_map.z() << 
-                        "), Orientation = (" << orientation_map.w() << ", " << orientation_map.x() << ", " << orientation_map.y() << 
-                        ", " << orientation_map.z() << ")");
-
-
-
-                        RCLCPP_WARN_STREAM(rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                                                "PoseStamped Header: Frame ID = " << output_frame_.c_str() << 
-                                                "\nPose: Position = (" << Stair_.stair_pose_.position.x << ", " <<
-                                                Stair_.stair_pose_.position.y << ", " << Stair_.stair_pose_.position.z << 
-                                                "), Orientation = (" << Stair_.stair_pose_.orientation.x << ", " <<
-                                                Stair_.stair_pose_.orientation.y << ", " << Stair_.stair_pose_.orientation.z << 
-                                                ", " << Stair_.stair_pose_.orientation.w << ")");
-
-                        RCLCPP_WARN_STREAM(rclcpp::get_logger("logger_name"), // Replace "logger_name" with the name of your logger
-                                                "PoseStamped Header: Frame ID = " << map_frame_ << 
-                                                "\nPose: Position = (" << Stair_.stair_pose_in_map_.position.x << ", " <<
-                                                Stair_.stair_pose_in_map_.position.y << ", " << Stair_.stair_pose_in_map_.position.z << 
-                                                "), Orientation = (" << Stair_.stair_pose_in_map_.orientation.x << ", " <<
-                                                Stair_.stair_pose_in_map_.orientation.y << ", " << Stair_.stair_pose_in_map_.orientation.z << 
-                                                ", " << Stair_.stair_pose_in_map_.orientation.w << ")");
-                        RCLCPP_INFO(get_logger(),"getStair!");
+                        setStair();
+                        Stair_.TransformPoseToMap(bp2m);
 
                         // chack if its really proper candidate
                         is_valid_candidate = checkForValidCandidate(Stair_);
@@ -1102,7 +916,6 @@ namespace zion
                             }
                         }
 
-
                     // if there is single plane -> keep decrementing
                     }else{
                         if (stairs_arr_.size()>0){
@@ -1112,7 +925,9 @@ namespace zion
                     }
 
                     if (stairs_arr_.size()>0){
-                            stair_detected_ = isDetectedStair(stairs_arr_, stairs_counts_arr_, detected_stair_filtered_); //
+                            stair_detected_ = isDetectedStair(stairs_arr_,
+                                                            stairs_counts_arr_,
+                                                            detected_stair_filtered_); //
 
                     }else{
                         stair_detected_ = false;
@@ -1124,9 +939,11 @@ namespace zion
                     // if stair detected set the stair instance and compute geometric parameters
                         // setStairTf();
                         // Publish the processed point cloud and custom msgs
+
+                        detected_stair_filtered_.TransformPoseToBase(m2bp);
+
                         RCLCPP_INFO_STREAM(this->get_logger(),"publish!!!!!! ");
                         // getStairPose();
-                        
 
                         rclcpp::Time now = this->get_clock()->now();
                         // publish stair hulls as marker array
@@ -1134,12 +951,6 @@ namespace zion
                                             output_frame_,
                                             now); 
 
-                        // publish stair params
-                        Eigen::Affine3d pose_eigen;
-                        Eigen::Affine3d pose_in_map_eigen;
-                        tf2::fromMsg(detected_stair_filtered_.stair_pose_in_map_,pose_in_map_eigen);
-                        pose_eigen = m2bp * pose_in_map_eigen;
-                        detected_stair_filtered_.stair_pose_ = tf2::toMsg(pose_eigen);
 
                         publishStair(detected_stair_filtered_,
                                             output_frame_,
@@ -1149,8 +960,8 @@ namespace zion
                         publishStairPose(detected_stair_filtered_.stair_pose_,
                                             output_frame_,
                                             now); 
-
                     }
+
                     else if (Planes_.size()==1) //just plane detected
                     {   
                         rclcpp::Time now = this->get_clock()->now();

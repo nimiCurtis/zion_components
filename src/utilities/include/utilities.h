@@ -1,6 +1,20 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
+
+// ROS application/library includes
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <tf2_eigen/tf2_eigen.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+#include <tf2/transform_datatypes.h>
+
 // Third party libraries
 #include <pcl/common/transforms.h>
 #include <pcl/filters/extract_indices.h>
@@ -158,6 +172,11 @@ public:
      * @param color Vector containing RGB values.
      */
     static bool getPointFromPixelCoordinates(pcl::PointXYZRGB& point, int pixel_x, int pixel_y, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pcl_cloud);
+
+    static Eigen::Affine3d PoseToEigen(const geometry_msgs::msg::Pose& pose);
+
+    static geometry_msgs::msg::Pose EigenToPose(const Eigen::Affine3d& pose_eigen);
+
 
 };
 

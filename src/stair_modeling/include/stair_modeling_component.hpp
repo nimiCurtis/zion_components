@@ -228,7 +228,7 @@ namespace zion
          * This function initializes the Stair object based on the properties of the detected planes.
          * It determines the type (ascending/descending), dimensions, and other characteristics of the stair.
          */
-        void getStair();
+        void setStair();
         
         /**
          * @brief Computes the pose of the detected stair.
@@ -246,7 +246,6 @@ namespace zion
 
         // Not in use. 
         void calcPlaneSlope();
-        void setStairTf();
 
 
 

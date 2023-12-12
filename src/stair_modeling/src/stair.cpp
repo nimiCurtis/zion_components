@@ -14,36 +14,79 @@
 
 // Custom includes
 #include "stair.h"
+#include <rclcpp/rclcpp.hpp>
 
-void Stair::calcStairHeightAndDist(double yThreshold, int x_neighbors)
-{
-    // Calculate the height of the stair by taking the absolute difference
-    // between the 3rd coefficients of the plane equations of the first two planes
-    step_height_ = fabs(Planes_[0].plane_coefficients_->values[3] - Planes_[1].plane_coefficients_->values[3]);
+// type = 0 -> floor is the lower = begin level = end
+// type = 1 -> floor is the upper = end level = begin
+void Stair::setStairPose()
+{   
+    Plane pose_plane = Planes_.front().get();;
 
-    // Check if the stair is upwards
-    if(type_ == 0)
-    {
-        // If upwards, calculate the distance by finding the average x-coordinate
-        // of the points below yThreshold in the second plane's cloud
-        step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[1].cloud_, yThreshold, x_neighbors, true);
-    }
-    else // The stair is downwards
-    {
-        // If downwards, calculate the distance by finding the average x-coordinate
-        // of the points below yThreshold in the second plane's cloud
-        step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_[1].cloud_, yThreshold, x_neighbors, false);
-    }
+    stair_pose_.position.x = step_distance_;
+    stair_pose_.position.y = pose_plane.centroid_.y;
+    stair_pose_.position.z = pose_plane.centroid_.z;
+
+    setStairOrientation();
 }
 
-bool Stair::checkValidHeight(float source_plane_h, float target_plane_h)
-{   
-    float diff = std::abs(source_plane_h - target_plane_h);
-    if (k_height_min <= diff && diff <= k_height_max)
-    {
-        return true;
+geometry_msgs::msg::Pose Stair::getStairPose() const
+{
+    return stair_pose_;
+}
+
+void Stair::setStairOrientation(){
+    Plane level_plane;
+    if (type_ == 0){
+        level_plane = Planes_.front().get();
     }
     else{
-        return false;
+        level_plane = Planes_.back().get();
     }
+
+    tf2::Matrix3x3 tf_rotation;
+    tf2::Quaternion tf_quaternion;
+    geometry_msgs::msg::Quaternion ros_quaternion;
+    tf_rotation.setValue(static_cast<double>(level_plane.plane_dir_(0, 0)), static_cast<double>(level_plane.plane_dir_(0, 1)), static_cast<double>(level_plane.plane_dir_(0, 2)),
+                    static_cast<double>(level_plane.plane_dir_(1, 0)), static_cast<double>(level_plane.plane_dir_(1, 1)), static_cast<double>(level_plane.plane_dir_(1, 2)),
+                    static_cast<double>(level_plane.plane_dir_(2, 0)), static_cast<double>(level_plane.plane_dir_(2, 1)), static_cast<double>(level_plane.plane_dir_(2, 2)));
+
+    double roll ; double pitch ; double yaw;
+    tf_rotation.getEulerYPR(yaw,pitch,roll);
+    tf2::Quaternion q_rotation;
+    if(pitch>=0){q_rotation.setRPY(0.,0.,pitch - M_PI/2);}
+    else{q_rotation.setRPY(0.,0.,pitch + M_PI/2);}
+    q_rotation.normalize();
+
+    ros_quaternion = tf2::toMsg(q_rotation);
+    stair_pose_.orientation = ros_quaternion;
 }
+
+geometry_msgs::msg::Quaternion Stair::getStairOrientation() const
+{      
+    return stair_pose_.orientation;
+}
+
+void Stair::TransformPoseToMap(Eigen::Affine3d& bp2m)
+{
+    Eigen::Affine3d pose_eigen;
+    Eigen::Affine3d pose_eigen_in_map;
+
+    pose_eigen = Utilities::PoseToEigen(stair_pose_);
+    pose_eigen_in_map = bp2m * pose_eigen; 
+
+    stair_pose_in_map_ = Utilities::EigenToPose(pose_eigen_in_map);
+
+}
+
+void Stair::TransformPoseToBase(Eigen::Affine3d& m2bp)
+{
+    Eigen::Affine3d pose_eigen;
+    Eigen::Affine3d pose_eigen_in_map;
+
+    pose_eigen_in_map = Utilities::PoseToEigen(stair_pose_in_map_);
+    pose_eigen = m2bp * pose_eigen_in_map; 
+
+    stair_pose_ = Utilities::EigenToPose(pose_eigen);
+}
+
+

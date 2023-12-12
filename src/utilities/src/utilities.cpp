@@ -199,6 +199,25 @@ void Utilities::colorize(const pcl::PointCloud<pcl::PointXYZRGB> &pc,
     }
 }
 
+Eigen::Affine3d Utilities::PoseToEigen(const geometry_msgs::msg::Pose& pose)
+{
+    Eigen::Affine3d pose_eigen;
+    tf2::fromMsg(pose, pose_eigen);
+
+    return pose_eigen;
+}
+
+geometry_msgs::msg::Pose Utilities::EigenToPose(const Eigen::Affine3d& pose_eigen)
+{
+    geometry_msgs::msg::Pose pose;
+    pose = tf2::toMsg(pose_eigen);
+
+    return pose;
+}
+
+
+
+
 
 // bool getPointFromPixelCoordinates(pcl::PointXYZRGB& point, int pixel_x, int pixel_y, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pcl_cloud)
 // {

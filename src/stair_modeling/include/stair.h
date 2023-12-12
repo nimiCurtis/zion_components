@@ -21,6 +21,15 @@
 // ROS application/library includes
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose.hpp>
+#include <tf2_eigen/tf2_eigen.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+#include <tf2/transform_datatypes.h>
 
 // Custom includes
 #include "plane.h"
@@ -28,7 +37,7 @@
 
 // Parameters for height of the stairs, given by the regulations:
 const float k_height_min = 0.07f;  // Min height 
-const float k_height_max = 0.25f;    //1.f; 0.2f Max height 
+const float k_height_max = 0.5f;    //1.f; 0.2f Max height 
 // const float k_length_min = 0.1f;   // Min length is 20 cm (no max length)
 const float k_area_min = 0.2f; // Min step area
 
@@ -36,49 +45,62 @@ class Stair
 {
 public:
 
-    Stair( int type, // 0 = upwards, 1 = downwards
-            float step_width, // Width of the step
-            float step_length, // Length of the step
-            float step_height, // Height of the step
-            float step_distance, // Distance between steps
-            float step_angle,
-            std::vector<Plane> planes){
+    Stair(const std::vector<Plane>& planes)
+        {
 
-            type_ = type;
-            step_width_ = step_width;
-            step_length_ = step_length;
-            step_distance_ = step_distance;
-            step_height_ = step_height;
-            step_angle_ = step_angle;
-
-            for (int i=0; i< static_cast<int>(planes.size()); i++){
-                Planes_.push_back(planes[i]);
-            }
-            
-            // TODO // sort planes
-            
-
-            // TODO // setPose
-            // setPose <- set orientation inside
-
-        }
-
-
-    /**
-     * @brief Constructor that initializes the stair with given planes.
-     * @param planes Vector of Plane objects representing the steps.
-     */
-    Stair(std::vector<Plane> planes){
-            step_distance_ = 0.;
-            step_height_ = 0.;
-            step_width_ = 0.;
-            step_length_ = 0.;
-            step_angle_ = 0.;
-
-            for (int i=0; i< static_cast<int>(planes.size()); i++){
-                Planes_.push_back(planes[i]);
+            for (const Plane& plane : planes){
+                Planes_.push_back(plane);
             } 
+
+            auto compareByHeight = [](const Plane& plane1, const Plane& plane2) {
+                return plane1.plane_coefficients_->values[3] < plane2.plane_coefficients_->values[3];
+            };
+
+            // sorting by height 
+            // min height is first
+            std::sort(Planes_.begin(), Planes_.end(), compareByHeight);
+
+            step_height_ = fabs(Planes_.front().plane_coefficients_->values[3] 
+                                - Planes_.back().plane_coefficients_->values[3]);
+
+            if(Planes_.back().type_ == 0){
+                std::cout<<" Upward Stair!"<< std::endl;
+                type_ = 0;
+                step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_.front().cloud_,
+                                                                        0.055, 30, true);
+                step_length_ = planes.front().length_;
+                step_width_ = planes.front().width_;
+
+            }else{
+                std::cout<<" Downward Stair!"<< std::endl;
+                type_ = 1;
+                step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_.front().cloud_,
+                                                                        0.055, 30, false);
+                step_length_ = planes.back().length_;
+                step_width_ = planes.back().width_;
+            }
+
+            setStairPose();
+            step_angle_ = Utilities::rad2deg(std::atan2(stair_pose_.position.y,
+                                                                    stair_pose_.position.x));                                             
         }
+
+
+    // /**
+    //  * @brief Constructor that initializes the stair with given planes.
+    //  * @param planes Vector of Plane objects representing the steps.
+    //  */
+    // Stair(const std::vector<Plane>& planes){
+    //         step_distance_ = 0.;
+    //         step_height_ = 0.;
+    //         step_width_ = 0.;
+    //         step_length_ = 0.;
+    //         step_angle_ = 0.;
+
+    //         for (int i=0; i< static_cast<int>(planes.size()); i++){
+    //             Planes_.push_back(planes[i]);
+    //         } 
+    //     }
     
     /**
      * @brief Default constructor. Initializes stair parameters to zero.
@@ -96,29 +118,21 @@ public:
      */
     ~Stair(){}
 
-    /**
-     * @brief Calculates the height and distance of the stair.
-     * @param yThreshold Y-coordinate threshold for calculating average x-coordinate.
-     * @param x_neighbors Number of neighbors to consider for averaging x-coordinate.
-     */
-    void calcStairHeightAndDist(double yThreshold, int x_neighbors);
+    Stair& get(){
+        return *this;
+    }
 
-    /**
-     * @brief Check if the hegith deffernce is stand with the stairs regulations and standards.
-     * @param source_plane_h The height of the source plane.
-     * @param target_plane_h The height of the target plane.
-     */
+    void setStair(const std::vector<Plane>& planes);
 
-    static bool checkValidHeight(float source_plane_h, float target_plane_h);
-
-    geometry_msgs::msg::Quaternion getStairOrientation();
+    geometry_msgs::msg::Quaternion getStairOrientation() const;
     void setStairOrientation();
 
-    geometry_msgs::msg::Pose getStairPose();
+    geometry_msgs::msg::Pose getStairPose() const;
     void setStairPose();
 
-    geometry_msgs::msg::Pose getStairPoseInMap();
-    void setStairPoseInMap();
+    void TransformPoseToMap(Eigen::Affine3d&) ;
+    void TransformPoseToBase(Eigen::Affine3d&) ;
+
 
     // Members:
     std::vector<Plane> Planes_; // Step candidates given by the detection process

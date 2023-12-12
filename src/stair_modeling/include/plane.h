@@ -45,6 +45,7 @@ public:
         cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
         hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
         plane_dir_.setZero();
+        type_ = 1; // set default type to level
     }
 
     /**
@@ -60,12 +61,17 @@ public:
         plane_dir_.setZero();
         *cloud_ = *cloud_in;
         processPlane();
+        type_ = 1; // set default type to level
     }
 
     /**
      * @brief Default destructor.
      */
     ~Plane(){}
+
+    Plane& get(){
+        return *this;
+    }
 
     /**
      * @brief Processes the plane by setting its features and computing its convex hull.
