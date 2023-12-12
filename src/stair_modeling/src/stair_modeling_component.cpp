@@ -570,140 +570,6 @@ namespace zion
     }
 
 
-    // void StairModeling::publishPlanesHulls(const std::vector<Plane>& planes,
-    //                             const std::string& cloud_frame,
-    //                             rclcpp::Time& now)
-    // {   
-    //     geometry_msgs::msg::Point point;
-    //     std_msgs::msg::ColorRGBA point_color;
-    //     visualization_msgs::msg::MarkerArray ma;
-    //     visualization_msgs::msg::MarkerArray temp;
-
-    //     const std::vector<double> floor_color = {0.,0.,255.}; ///< Vector storing colors for visualization.
-        
-    //     const std::vector<double> level_color = {0.,255.,0.}; ///< Vector storing colors for visualization.
-
-    //     for (size_t i = 0; i < planes.size(); i++){
-
-    //         double r;
-    //         double g;
-    //         double b;
-    //         std::string ns;
-
-    //         if(planes[i].type_==0){
-    //                 ns = "Floor" ;
-    //                 r = floor_color[0]/255.;
-    //                 g = floor_color[1]/255.;
-    //                 b = floor_color[2]/255.;
-    //         }else{
-    //                 ns = "Level";
-    //                 r = level_color[0]/255.;
-    //                 g = level_color[1]/255.;
-    //                 b = level_color[2]/255.;
-    //         }
-
-    //         visualization_msgs::msg::Marker marker;
-    //         marker.header.frame_id = cloud_frame;
-    //         marker.header.stamp = now;
-    //         marker.ns = "ns" + i;
-    //         marker.id = i;
-    //         marker.type = visualization_msgs::msg::Marker::LINE_LIST;
-    //         marker.action = visualization_msgs::msg::Marker::ADD;
-    //         marker.pose.position.x = 0;
-    //         marker.pose.position.y = 0;
-    //         marker.pose.position.z = 0;
-    //         marker.pose.orientation.x = 0.0;
-    //         marker.pose.orientation.y = 0.0;
-    //         marker.pose.orientation.z = 0.0;
-    //         marker.pose.orientation.w = 1.0;
-    //         marker.scale.x = 0.03;
-    //         marker.scale.y = 0.03;
-    //         marker.scale.z = 0.03;
-    //         marker.color.a = 1.0;
-
-    //         marker.points.reserve(planes[i].hull_->points.size());
-    //         marker.colors.reserve(planes[i].hull_->points.size());
-
-    //         for (size_t j = 1; j < planes[i].hull_->points.size(); j++){
-    //             point.x = planes[i].hull_->points[j-1].x;
-    //             point.y = planes[i].hull_->points[j-1].y;
-    //             point.z = planes[i].hull_->points[j-1].z;
-    //             point_color.r = 1.;
-    //             point_color.g = 0.5;
-    //             point_color.b = 0.3;
-    //             point_color.a = 1.0;
-    //             marker.colors.push_back(point_color);
-    //             marker.points.push_back(point);
-    //         }
-
-    //         // start to end line:
-    //         point.x = planes[i].hull_->points[0].x;
-    //         point.y = planes[i].hull_->points[0].y;
-    //         point.z = planes[i].hull_->points[0].z;
-    //         point_color.r = 1.;
-    //         point_color.g = 0.5;
-    //         point_color.b = 0.3;
-    //         point_color.a = 1.0;
-    //         marker.colors.push_back(point_color);
-    //         marker.points.push_back(point);
-
-    //         point.x = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].x;
-    //         point.y = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].y;
-    //         point.z = planes[i].hull_->points[ planes[i].hull_->points.size()-1 ].z;
-    //         point_color.r = 1.;
-    //         point_color.g = 0.5;
-    //         point_color.b = 0.3;
-    //         point_color.a = 1.0;
-    //         point_color.a = 1.0;
-    //         marker.colors.push_back(point_color);
-    //         marker.points.push_back(point);
-
-    //         marker.frame_locked = false;
-
-    //         // // Create an additional marker for the label
-    //         // visualization_msgs::msg::Marker text_marker;
-    //         // text_marker.header.frame_id = cloud_frame;
-    //         // text_marker.header.stamp = now;
-    //         // text_marker.ns = ns + "_text_";
-    //         // text_marker.id = i + planes.size(); // Unique ID, different from the hull marker
-    //         // text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
-    //         // text_marker.action = visualization_msgs::msg::Marker::ADD;
-
-    //         // // Position the text marker (adjust as needed)
-    //         // // For example, place it at the first point of the hull
-    //         // text_marker.pose.position.x = planes[i].hull_->points[0].x;
-    //         // text_marker.pose.position.y = planes[i].hull_->points[0].y;
-    //         // text_marker.pose.position.z = planes[i].hull_->points[0].z + 0.2; // Slightly above the hull
-
-    //         // // Set the orientation of the text marker
-    //         // text_marker.pose.orientation.x = 0.0;
-    //         // text_marker.pose.orientation.y = 0.0;
-    //         // text_marker.pose.orientation.z = 0.0;
-    //         // text_marker.pose.orientation.w = 1.0;
-
-    //         // // Set the scale (size) of the text marker
-    //         // text_marker.scale.z = 0.1; // Adjust text size as needed
-
-    //         // // Set the color of the text marker
-    //         // text_marker.color.r = 1.0;
-    //         // text_marker.color.g = 1.0;
-    //         // text_marker.color.b = 1.0;
-    //         // text_marker.color.a = 1.0;
-
-    //         // // Set the text of the text marker
-    //         // text_marker.text = ns;
-
-    //         // ma.markers->values
-    //         // Add the text marker to the MarkerArray
-    //         // ma.markers[index] = marker;
-    //         // ma.markers[index+1] = text_marker;
-    //         // ma.markers.push_back(text_marker);
-    //         ma.markers.push_back(marker);
-    //     }
-
-    //     hull_marker_array_pub_->publish(ma);
-
-    // }
 
     void StairModeling::publishPlanesHulls(const std::vector<Plane>& planes,
                                 const std::string& cloud_frame,
@@ -718,8 +584,8 @@ namespace zion
 
                 visualization_msgs::msg::Marker marker;
                 marker.header.frame_id = cloud_frame;
-                marker.header.stamp = this->get_clock()->now();
-                marker.ns = "hull_" + std::to_string(i);
+                marker.header.stamp = now;
+                marker.ns = "hull_" + i;
                 marker.id = i;
                 marker.type = visualization_msgs::msg::Marker::LINE_LIST;
                 marker.action = visualization_msgs::msg::Marker::ADD;
@@ -736,9 +602,9 @@ namespace zion
                 marker.color.a = 1.0;
 
 
-                const double r = 1.;
-                const double g = 0.5;
-                const double b = 0.3;
+                const double r = 0.1;
+                const double g = 0.1;
+                const double b = 1.0;
                 marker.points.reserve(planes[i].hull_->points.size());
                 marker.colors.reserve(planes[i].hull_->points.size());
 
