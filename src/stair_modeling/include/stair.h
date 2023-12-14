@@ -37,7 +37,7 @@
 
 // Parameters for height of the stairs, given by the regulations:
 const float k_height_min = 0.07f;  // Min height 
-const float k_height_max = 1.f;    //1.f; 0.2f Max height 
+const float k_height_max = 0.3f;    //1.f; 0.2f Max height 
 // const float k_length_min = 0.1f;   // Min length is 20 cm (no max length)
 const float k_area_min = 0.2f; // Min step area
 

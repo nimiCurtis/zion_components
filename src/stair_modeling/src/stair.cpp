@@ -37,10 +37,10 @@ geometry_msgs::msg::Pose Stair::getStairPose() const
 void Stair::setStairOrientation(){
     Plane level_plane;
     if (type_ == 0){
-        level_plane = Planes_.front().get();
+        level_plane = Planes_.back().get();
     }
     else{
-        level_plane = Planes_.back().get();
+        level_plane = Planes_.front().get();
     }
 
     tf2::Matrix3x3 tf_rotation;
@@ -60,6 +60,7 @@ void Stair::setStairOrientation(){
     ros_quaternion = tf2::toMsg(q_rotation);
     stair_pose_.orientation = ros_quaternion;
 }
+
 
 geometry_msgs::msg::Quaternion Stair::getStairOrientation() const
 {      
