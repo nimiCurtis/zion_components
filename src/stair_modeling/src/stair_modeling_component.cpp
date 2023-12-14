@@ -73,6 +73,15 @@ namespace zion
         pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
 
 
+                // Services
+        stair_service_ = this->create_service<zion_msgs::srv::GetStair>(
+                "~/get_stair",
+                std::bind(&StairModeling::get_stair_service_callback, this,
+                     std::placeholders::_1, std::placeholders::_2),
+                rmw_qos_profile_services_default,
+                cbg1
+        );
+
         // init tf instances
         tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock(),tf2::durationFromSec(10));
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -85,6 +94,37 @@ namespace zion
         RCLCPP_DEBUG(get_logger(), "Destroying node");
     }
 
+
+    void StairModeling::get_stair_service_callback(
+                const std::shared_ptr<zion_msgs::srv::GetStair::Request> request,
+                const std::shared_ptr<zion_msgs::srv::GetStair::Response> response)
+    {   
+        RCLCPP_WARN_STREAM(this->get_logger(),
+            "Received request:"
+            << "\nid: " << request->id);
+
+        double distance = -1.;
+        bool success = false;
+
+        if(stair_detected_){
+            if(request->id==detected_stair_filtered_.type_){
+                distance = detected_stair_filtered_.step_distance_;
+                success = true;
+            }else{
+                RCLCPP_WARN(this->get_logger(), "Detection type mismatch!");
+
+            }
+        }else{
+            RCLCPP_WARN(this->get_logger(), "Stair wasn't detected by analytical modeling!");
+        }
+        
+        response->success = success;
+        response->distance = distance;
+        RCLCPP_WARN_STREAM(this->get_logger(),
+            "Sending response:"
+            << "\nsucess: " << (response->success ? "true" : "false")
+            << "\ndistance: " << response->distance);
+    }
 
     void StairModeling::loadParams()
     {

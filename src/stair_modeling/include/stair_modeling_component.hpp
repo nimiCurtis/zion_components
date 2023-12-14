@@ -72,6 +72,7 @@ using namespace std::chrono_literals;
 #include <zion_msgs/msg/stair.hpp>
 #include <zion_msgs/msg/stair_stamped.hpp>
 #include <zion_msgs/msg/stair_det_stamped.hpp>
+#include <zion_msgs/srv/get_stair.hpp>
 
 namespace zion
 {
@@ -146,10 +147,14 @@ namespace zion
          * @brief Publishes the the Stair msgs.
          * @param cloud_frame The frame ID of the point cloud.
          */
-
         void publishStair(const Stair& stair,
                             const std::string& cloud_frame,
                             rclcpp::Time& now);
+
+
+        void get_stair_service_callback(
+            const std::shared_ptr<zion_msgs::srv::GetStair::Request> request,
+            const std::shared_ptr<zion_msgs::srv::GetStair::Response> response);
 
         /**
          * @brief Loads parameters from the parameter server.
@@ -260,6 +265,9 @@ namespace zion
         rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_pub_;
         geometry_msgs::msg::Pose::SharedPtr stair_pose_; ///< Pose of the detected stair.
+
+        // Services
+        rclcpp::Service<zion_msgs::srv::GetStair>::SharedPtr stair_service_;
 
         // tf2_ros
         std::unique_ptr<tf2_ros::Buffer> tf_buffer_; ///< Buffer to store transforms for the tf2 listener.

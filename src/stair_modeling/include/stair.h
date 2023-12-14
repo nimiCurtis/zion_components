@@ -37,7 +37,7 @@
 
 // Parameters for height of the stairs, given by the regulations:
 const float k_height_min = 0.07f;  // Min height 
-const float k_height_max = 0.5f;    //1.f; 0.2f Max height 
+const float k_height_max = 1.f;    //1.f; 0.2f Max height 
 // const float k_length_min = 0.1f;   // Min length is 20 cm (no max length)
 const float k_area_min = 0.2f; // Min step area
 
@@ -101,7 +101,7 @@ public:
     //             Planes_.push_back(planes[i]);
     //         } 
     //     }
-    
+
     /**
      * @brief Default constructor. Initializes stair parameters to zero.
      */
@@ -132,7 +132,6 @@ public:
 
     void TransformPoseToMap(Eigen::Affine3d&) ;
     void TransformPoseToBase(Eigen::Affine3d&) ;
-
 
     // Members:
     std::vector<Plane> Planes_; // Step candidates given by the detection process
