@@ -73,7 +73,7 @@ namespace zion
         pcl_buffer_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
 
 
-                // Services
+        // Services
         stair_service_ = this->create_service<zion_msgs::srv::GetStair>(
                 "~/get_stair",
                 std::bind(&StairModeling::get_stair_service_callback, this,
@@ -243,16 +243,9 @@ namespace zion
         RCLCPP_INFO(get_logger(),"***************************************");
     }
 
-    void StairModeling::printDebug()
-    {
-        debug_msg_ = debug_msg_ + "\n-----";
-        RCLCPP_INFO( this->get_logger(), "%s", debug_msg_.c_str());
-    }
-
     void StairModeling::reset()
     {
         Planes_.clear();
-        debug_msg_ = "debug";
         planes_empty_ = true;
     }
 
@@ -275,7 +268,11 @@ namespace zion
 
             while ((outlier_points->points.size() > 0.15 * n_points) && i<2) {
                 i++;
-                debug_msg_ = debug_msg_ + "\nRansac iteration: " + std::to_string(i);
+
+                if(debug_){ 
+                    RCLCPP_INFO_STREAM(this->get_logger(), 
+                        "Ransac iteration: " << i);
+                }
 
                 // get the segmented plane cloud
                 pcl::ModelCoefficients::Ptr plane_coefficients(new pcl::ModelCoefficients());
@@ -301,9 +298,11 @@ namespace zion
 
                     /// keep outlier
                     Utilities::getCloudByInliers(outlier_points, outlier_points, plane_indices, true, false); 
-                    debug_msg_ = debug_msg_ + "\nPlane " + std::to_string(i) + " has: " + std::to_string(plane_points->points.size()) + " points";
                     
                     if (!plane_points_clustered->empty()){
+
+                        planes_empty_ = false;
+
                         // get the first plane 
                         if (Planes_.size()==0){
                             Plane plane = Plane(plane_points_clustered,plane_coefficients);
@@ -325,53 +324,40 @@ namespace zion
                                 i--;
                             } 
                         }
+                        
+                        // TODO: 
+                        // fix dubugging
+                        // if(debug_){ 
+                        //     RCLCPP_INFO_STREAM(this->get_logger(), 
+                        //         "\n--------  Plane: " << i << " --------" 
+                        //         << "\nNumber of points: " << plane_points->points.size()
+                        //         << "\nCoefficients: [" << Planes_[-1].plane_coefficients_->values[0]
+                        //                             << " " << Planes_[-1].plane_coefficients_->values[1]
+                        //                             << " " << Planes_[-1].plane_coefficients_->values[2]
+                        //                             << " " << Planes_[-1].plane_coefficients_->values[3] << "]"
+                        //         << "\nCentroid: x: " << Planes_[-1].centroid_.x << " | "
+                        //                             << "y: " << Planes_[-1].centroid_.y << " | "
+                        //                             << "z: " << Planes_[-1].centroid_.z
+                        //         << "\nPCA rotation matrix: \n[ "
+                        //             << Planes_[-1].plane_dir_.col(0)[0] <<" "<< Planes_[-1].plane_dir_.col(1)[0] <<" "<< Planes_[-1].plane_dir_.col(2)[0]
+                        //             << "\n " << Planes_[-1].plane_dir_.col(0)[1] <<" "<< Planes_[-1].plane_dir_.col(1)[1] <<" "<< Planes_[-1].plane_dir_.col(2)[1]
+                        //             << "\n "<< Planes_[-1].plane_dir_.col(0)[2] <<" "<< Planes_[-1].plane_dir_.col(1)[2] <<" "<< Planes_[-1].plane_dir_.col(2)[2] << " ]"
+                        //         << "\nBound rectangle center: "<< Planes_[-1].center_.x << " | "
+                        //                             << "y: " << Planes_[-1].center_.y << " | "
+                        //                             << "z: " << Planes_[-1].center_.z
+                        //         << "\nArea: " << (Planes_[-1].width_ * Planes_[-1].length_)
+                        //         << "\n------------\n"
+                        //         );
+                        // }
+
                     }
                     else{
                         // Handle the case when there are no valid indices
-                        RCLCPP_WARN(get_logger(), "No valid indices provided for projection.");
+                        RCLCPP_WARN(get_logger(), "No valid indices provided for projection.\n");
                         break;
                     }
-            } // while
-
-
-            if (!Planes_.empty()){
-                planes_empty_ = false;
-                // planes features for debug
-                for (size_t i = 0; i < Planes_.size(); ++i) {
-                                debug_msg_ = debug_msg_ + "\n------- Plane: " + std::to_string(i+1) + "-------";
-
-                                debug_msg_ = debug_msg_ +  
-                                "\ncoefficients: [" + std::to_string(Planes_[i].plane_coefficients_->values[0]) + " "
-                                                    + std::to_string(Planes_[i].plane_coefficients_->values[1]) + " "
-                                                    + std::to_string(Planes_[i].plane_coefficients_->values[2]) + " "
-                                                    + std::to_string(Planes_[i].plane_coefficients_->values[3]) + "]";
-
-                                debug_msg_ = debug_msg_ + 
-                                "\ncentroid: " +"x: " + std::to_string(Planes_[i].centroid_.x) + " | "
-                                            +"y: " + std::to_string(Planes_[i].centroid_.y) + " | "
-                                            +"z: " + std::to_string(Planes_[i].centroid_.z);
-                                
-                                debug_msg_ = debug_msg_ +
-                                "\nPCA rotation matrix: " +" \n[" + std::to_string(Planes_[i].plane_dir_.col(0)[0]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[0])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[0])
-                                                        +"\n " + std::to_string(Planes_[i].plane_dir_.col(0)[1]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[1])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[1])
-                                                        +"\n " + std::to_string(Planes_[i].plane_dir_.col(0)[2]) + " " + std::to_string(Planes_[i].plane_dir_.col(1)[2])+ " " + std::to_string(Planes_[i].plane_dir_.col(2)[2])+"]";
-
-                                debug_msg_ = debug_msg_ + 
-                                "\nbounding rect center: " +"x: " + std::to_string(Planes_[i].center_.x) + " | "
-                                            +"y: " + std::to_string(Planes_[i].center_.y) + " | "
-                                            +"z: " + std::to_string(Planes_[i].center_.z);
-                                
-                                debug_msg_ = debug_msg_ + 
-                                "\narea: " + std::to_string(Planes_[i].width_ * Planes_[i].length_);
-                                
-                                debug_msg_ = debug_msg_ + "\n-----";
-                }
-            }
-            else{
-                planes_empty_ = true;
-                debug_msg_ = debug_msg_ + "\nNo planes!" + "\n-----";
-            }
-        }
+            } 
+        } // while
     }
 
 
@@ -417,26 +403,34 @@ namespace zion
         // set planes type 
         Planes_[floor_index].type_ = 0; // set as floor
 
+        if(debug_){ 
+                    RCLCPP_INFO_STREAM(this->get_logger(), 
+                        "FindFloor: floor_index:" << floor_index);
+        }
+
     }
 
     bool StairModeling::checkForValidCandidate(Stair& stair)
     {   
         // TODO // 
         // add connectivity distance 
-
+        bool is_valid = false;
         // check the level length is more then the min
-            if(
-            // && Stair_.step_length_>=k_length_min --> change to volume
-            stair.step_height_>=k_height_min 
+        if(stair.step_height_>=k_height_min 
             && stair.step_height_<=k_height_max
             && (stair.step_length_*stair.step_width_)>=k_area_min){
-            return true;
-        }else{
-            return false;
+            is_valid = true;
         }
+
+        if(debug_){ 
+                    RCLCPP_INFO_STREAM(this->get_logger(), 
+                        "Check stair candidate: valid:" << (is_valid ? "true" : "false"));
+        }
+        
+        return is_valid;
     }
 
-// Function to calculate the Euclidean distance between two poses
+    // Function to calculate the Euclidean distance between two poses
     double StairModeling::calculatePositionError(const Stair& stair1, const Stair& stair2)
     {
         double x1 = stair1.stair_pose_in_map_.position.x, x2 = stair2.stair_pose_in_map_.position.x;
@@ -473,13 +467,19 @@ namespace zion
     }
 
     void StairModeling::decrementCounter(std::vector<int>& counter_buffer){
-        RCLCPP_INFO_STREAM(this->get_logger(),"Decrementing Counter | buffer size: " << counter_buffer.size());
+        
+        if(debug_){
+                RCLCPP_INFO_STREAM(this->get_logger(),"Decrementing Counter | buffer size: " << counter_buffer.size());
+        }
+        
         // decrement every counts
         for (size_t j=0; j<counter_buffer.size(); j++){
             
             stairs_counts_arr_[j]--;
-            RCLCPP_INFO_STREAM(this->get_logger(),"Decrement count of stair index: " << j 
-                                        << " to: " << stairs_counts_arr_[j]);
+            if(debug_){
+                RCLCPP_INFO_STREAM(this->get_logger(),"Decrement count of stair index: " << j 
+                                            << " to: " << stairs_counts_arr_[j]);
+            }
         } // for
     }
 
@@ -489,7 +489,9 @@ namespace zion
         for (size_t i=0; i<counter_buffer.size(); i++){
             // check if coounts is below counts thresh -> then remove the stair from buffer             
             if (counter_buffer[i]<=-filter_min_limit_){
-                        RCLCPP_INFO_STREAM(this->get_logger(),"removing stair number: " << i);
+                        if(debug_){
+                            RCLCPP_INFO_STREAM(this->get_logger(),"removing stair number: " << i);
+                        }
                         auto iter_stairs = stairs_buffer.begin() + i;
                         auto iter_counts = counter_buffer.begin() + i;
                         // erase elements
@@ -497,7 +499,10 @@ namespace zion
                         counter_buffer.erase(iter_counts);
             }
         }
-        RCLCPP_INFO_STREAM(this->get_logger(),"buffer cleaning | (post) buffer size: " << counter_buffer.size());
+
+        if(debug_){
+            RCLCPP_INFO_STREAM(this->get_logger(),"buffer cleaning | (post) buffer size: " << counter_buffer.size());
+        }
     }
 
     void StairModeling::pushToBuffers(std::vector<Stair>& stairs_buffer,
@@ -506,7 +511,10 @@ namespace zion
     {
         stairs_buffer.push_back(stair);
         counter_buffer.push_back(1);
-        RCLCPP_INFO_STREAM(this->get_logger(),"push to buffer | (post) buffer size: " << counter_buffer.size());
+
+        if(debug_){
+            RCLCPP_INFO_STREAM(this->get_logger(),"push to buffer | (post) buffer size: " << counter_buffer.size());
+        }
     }
 
     void StairModeling::updateBuffers(std::vector<Stair>& stairs_buffer,
@@ -517,23 +525,36 @@ namespace zion
         bool is_match = false;
         size_t i;
 
-        RCLCPP_INFO_STREAM(this->get_logger(),"update buffer | (pre) buffer size: " << counter_buffer.size());
+        if(debug_){
+            RCLCPP_INFO_STREAM(this->get_logger(),"update buffer | (pre) buffer size: " << counter_buffer.size());
+        }
+
         for (i=0;i<counter_buffer.size(); i++){
             err = calculatePositionError(stairs_buffer[i], stair);
-            RCLCPP_INFO_STREAM(this->get_logger(),"position error: " << err
+
+            if(debug_){
+                RCLCPP_INFO_STREAM(this->get_logger(),"position error: " << err
                                 << " | stair index: " << i);
+            }
+            
             if(err< pos_err_thresh_ && stairs_buffer[i].type_ == stair.type_ && !is_match){
                     counter_buffer[i]++;
                     updateStair(stairs_buffer[i],stair); 
                     is_match = true;
-                    RCLCPP_INFO_STREAM(this->get_logger(),"stair matched to stair number: " << i 
+
+                    if(debug_){
+                        RCLCPP_INFO_STREAM(this->get_logger(),"stair matched to stair number: " << i 
                                         << " and has total counts of: " << counter_buffer[i]);
+                    }
             }
             else{
                 counter_buffer[i]--;
-                RCLCPP_INFO_STREAM(this->get_logger(),"error is too big or type is discorrect!! so decrement count of index: " << i 
-                                    << " to: " << counter_buffer[i]);
+                if(debug_){
+                    RCLCPP_INFO_STREAM(this->get_logger(),"error is too big or type is discorrect!! so decrement count of index: " << i 
+                        << " to: " << counter_buffer[i]);
+                }
             }
+
         }
         if (i==counter_buffer.size()){
             pushToBuffers(stairs_buffer, counter_buffer, stair);
@@ -549,7 +570,9 @@ namespace zion
         size_t max_count_i;
         size_t i;
 
-        RCLCPP_INFO_STREAM(this->get_logger(),"check for detected stair | (pre) buffer size:" << counter_buffer.size());
+        if(debug_){
+            RCLCPP_INFO_STREAM(this->get_logger(),"check for detected stair | (pre) buffer size:" << counter_buffer.size());
+        }
         
         for (i=0;i<counter_buffer.size(); i++){
             if (counter_buffer[i] > max_count){
@@ -563,7 +586,10 @@ namespace zion
 
                 detect_stair = stairs_buffer[max_count_i].get();
                 
-                RCLCPP_INFO_STREAM(this->get_logger(),"stair detected index: " << max_count_i);
+                if(debug_){
+                    RCLCPP_INFO_STREAM(this->get_logger(),"stair detected index: " << max_count_i << "\n");
+                }
+
                 return true;
         }
         // else false stair detection
@@ -581,8 +607,6 @@ namespace zion
     void StairModeling::calcPlaneSlope()
     {
         Planes_[0].calcPlaneSlope();
-        debug_msg_ = debug_msg_ + "\nSlope is:  " + std::to_string(Planes_[0].slope_);
-        printDebug();
     }
 
 
@@ -608,8 +632,6 @@ namespace zion
 
         stair_pub_->publish(stair_stamped_msg);
     }
-
-
 
     void StairModeling::publishPlanesHulls(const std::vector<Plane>& planes,
                                 const std::string& cloud_frame,
@@ -694,13 +716,9 @@ namespace zion
                 marker.frame_locked = false;
                 ma.markers.push_back(marker);
             }
-
         }
         hull_marker_array_pub_->publish(ma);
-
     }
-
-
 
     void StairModeling::publishStairPose(const geometry_msgs::msg::Pose& pose,
                                         const std::string &cloud_frame,
@@ -722,8 +740,7 @@ namespace zion
         Eigen::Affine3d m2bp;
         Eigen::Affine3d bp2m;
 
-        RCLCPP_INFO_ONCE(get_logger(),"pcl Callback is running");
-        RCLCPP_INFO_STREAM(this->get_logger()," " );
+        RCLCPP_INFO_ONCE(get_logger(),"pcl Callback is running\n");
 
         // Check if transformation between frames is available
         if (tf_buffer_->canTransform(output_frame_, input_frame_, tf2::TimePointZero) &&
@@ -742,13 +759,10 @@ namespace zion
                     tf2::TimePointZero);//,
                     //50ms);
 
-
-
                 base_projected2map = tf_buffer_->lookupTransform(
                     map_frame_,output_frame_,
                     tf2::TimePointZero);//,
                 // TODO //// Lookup transform target_frame = map, source_frame = output_frame
-
 
                 // Convert ROS transform to Eigen transform
                 c2bp = tf2::transformToEigen(camera2base_projected);
@@ -758,7 +772,6 @@ namespace zion
                 // Initialize point clouds
                 pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
                 // pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_cloud (new  pcl::PointCloud<pcl::PointXYZRGB>);
-
                 // Convert ROS point cloud message to PCL point cloud
                 pcl::fromROSMsg(*pcl_msg, *input_cloud);
 
@@ -766,15 +779,12 @@ namespace zion
                 Utilities::voxelizingDownsample(input_cloud, input_cloud,
                                                 leaf_size_xy_,leaf_size_z_);
 
-
                 Utilities::transformCloud(c2bp,input_cloud,input_cloud);
-
 
                 Utilities::cropping(input_cloud, cloud_,
                                 min_x_,max_x_,
                                 min_y_,max_y_,
                                 min_z_,max_z_);
-
 
                 // Convert processed PCL point cloud to ROS message
                 // Publish pointcloud msg frequently
@@ -789,21 +799,18 @@ namespace zion
 
                 if(!planes_empty_){
                     // find the floor plane
-                    RCLCPP_INFO(get_logger(),"planes not empty!");
-
                     findFloor();
-                    RCLCPP_INFO(get_logger(),"find floor!");
 
                     bool is_valid_candidate = false;
                     if(Planes_.size()>1){
+
                         // get the raw stair properties
                         setStair();
                         Stair_.TransformPoseToMap(bp2m);
 
                         // chack if its really proper candidate
                         is_valid_candidate = checkForValidCandidate(Stair_);
-                        RCLCPP_INFO_STREAM(get_logger(),"checkForValidCandidate! is_valid_candidate = " 
-                                                        << is_valid_candidate);
+                        
                         if(!is_valid_candidate){
                             if (stairs_arr_.size()>0){
                                 decrementCounter(stairs_counts_arr_);
@@ -839,24 +846,21 @@ namespace zion
                         stair_detected_ = false;
                     }
 
-                    RCLCPP_INFO_STREAM(this->get_logger(),"is stair detected: " << stair_detected_);
-
                     if(stair_detected_){
-                    // if stair detected set the stair instance and compute geometric parameters
-                        // setStairTf();
-                        // Publish the processed point cloud and custom msgs
 
                         detected_stair_filtered_.TransformPoseToBase(m2bp);
 
-                        RCLCPP_INFO_STREAM(this->get_logger(),"publish!!!!!! ");
-                        // getStairPose();
+                        RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                            "Stair detected \nStair parameters: Type: " << detected_stair_filtered_.type_
+                            << "\n                  Distance: " << std::fixed << std::setprecision(3) << detected_stair_filtered_.step_distance_
+                            << "\n                  Height: " << std::fixed << std::setprecision(2) << detected_stair_filtered_.step_height_
+                            << "\nPublishing stair\n");
 
                         rclcpp::Time now = this->get_clock()->now();
                         // publish stair hulls as marker array
                         publishPlanesHulls(detected_stair_filtered_.Planes_,
                                             output_frame_,
                                             now); 
-
 
                         publishStair(detected_stair_filtered_,
                                             output_frame_,
@@ -870,6 +874,8 @@ namespace zion
 
                     else if (Planes_.size()==1) //just plane detected
                     {   
+                        RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+                            "Single plane detected");
                         rclcpp::Time now = this->get_clock()->now();
                         publishPlanesHulls(Planes_,
                                             output_frame_,
@@ -883,10 +889,7 @@ namespace zion
                 input_frame_.c_str(), output_frame_.c_str(), ex.what());
                 return;
             }
-            // debug msg
-            if(debug_){
-                printDebug();
-            }
+
         }
     }
 

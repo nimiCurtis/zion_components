@@ -35,97 +35,100 @@
  */
 class Plane
 {
-public:
+    public:
 
-    /**
-     * @brief Default constructor. Initializes empty clouds and other members.
-     */
-    Plane(){
-        cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        plane_dir_.setZero();
-        type_ = 1; // set default type to level
-    }
+        /**
+         * @brief Default constructor. Initializes empty clouds and other members.
+         */
+        Plane(){
+            cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+            cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+            hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+            plane_dir_.setZero();
+            type_ = 1; // set default type to level
+        }
 
-    /**
-     * @brief Construct a new Plane object and processes it.
-     * @param cloud_in Input point cloud representing the plane.
-     * @param plane_coeff Plane coefficients.
-     */
-    Plane(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, pcl::ModelCoefficients::Ptr plane_coeff) {
-        plane_coefficients_ = plane_coeff;
-        cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-        plane_dir_.setZero();
-        *cloud_ = *cloud_in;
-        processPlane();
-        type_ = 1; // set default type to level
-    }
+        /**
+         * @brief Construct a new Plane object and processes it.
+         * @param cloud_in Input point cloud representing the plane.
+         * @param plane_coeff Plane coefficients.
+         */
+        Plane(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, pcl::ModelCoefficients::Ptr plane_coeff) {
+            plane_coefficients_ = plane_coeff;
+            cloud_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+            cloud_projected_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+            hull_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+            plane_dir_.setZero();
+            *cloud_ = *cloud_in;
+            processPlane();
+            type_ = 1; // set default type to level
+        }
 
-    /**
-     * @brief Default destructor.
-     */
-    ~Plane(){}
+        /**
+         * @brief Default destructor.
+         */
+        ~Plane(){}
 
-    Plane& get(){
-        return *this;
-    }
+        /**
+         * @brief Get a reference to the current Plane object.
+         * @return A reference to the current Plane object.
+         */
+        Plane& get(){
+            return *this;
+        }
 
-    /**
-     * @brief Processes the plane by setting its features and computing its convex hull.
-     */
-    void processPlane();
+        /**
+         * @brief Processes the plane by setting its features and computing its convex hull.
+         */
+        void processPlane();
 
-    /**
-     * @brief Calculates the slope of the plane.
-     */
-    void calcPlaneSlope();
+        /**
+         * @brief Calculates the slope of the plane.
+         */
+        void calcPlaneSlope();
 
-    // Public Members:
+        // Public Members:
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_; // Original point cloud of the plane
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr hull_;  // Convex hull of the projected plane
-    pcl::PointXYZRGB centroid_;                    // Centroid of the plane
-    pcl::PointXYZRGB center_;                      // Center of the bounding rectangle
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_; // Original point cloud of the plane
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr hull_;  // Convex hull of the projected plane
+        pcl::PointXYZRGB centroid_;                    // Centroid of the plane
+        pcl::PointXYZRGB center_;                      // Center of the bounding rectangle
 
-    pcl::ModelCoefficients::Ptr plane_coefficients_;   // Plane coefficients
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected_;  // 2D projected cloud of the plane
+        pcl::ModelCoefficients::Ptr plane_coefficients_;   // Plane coefficients
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected_;  // 2D projected cloud of the plane
 
-    int type_;                // Type identifier (if needed for categorizing planes)
-    float slope_;             // Slope of the plane in degrees
-    float width_;             // Width measurement of the plane
-    float length_;            // Length measurement of the plane
-    Eigen::Matrix3f plane_dir_;   // PCA direction of the plane
+        int type_;                // Type identifier (if needed for categorizing planes)
+        float slope_;             // Slope of the plane in degrees
+        float width_;             // Width measurement of the plane
+        float length_;            // Length measurement of the plane
+        Eigen::Matrix3f plane_dir_;   // PCA direction of the plane
 
-private:
+    private:
 
-    /**
-     * @brief Computes the convex hull of the projected plane.
-     */
-    void computePlaneHull();
+        /**
+         * @brief Computes the convex hull of the projected plane.
+         */
+        void computePlaneHull();
 
-    /**
-     * @brief Projects the plane to 2D using the plane coefficients.
-     */
-    void projectPlaneTo2D();
+        /**
+         * @brief Projects the plane to 2D using the plane coefficients.
+         */
+        void projectPlaneTo2D();
 
-    /**
-     * @brief Computes the centroid of the plane's points.
-     */
-    void getCentroid();
+        /**
+         * @brief Computes the centroid of the plane's points.
+         */
+        void getCentroid();
 
-    /**
-     * @brief Computes the principal directions of the plane using PCA.
-     */
-    void getPrincipalDirections();
+        /**
+         * @brief Computes the principal directions of the plane using PCA.
+         */
+        void getPrincipalDirections();
 
-    /**
-     * @brief Computes measurements of the plane like width and length based on PCA directions.
-     */
-    void getMeasurements();
-
+        /**
+         * @brief Computes measurements of the plane like width and length based on PCA directions.
+         */
+        void getMeasurements();
 };
 
 #endif // PLANE_H

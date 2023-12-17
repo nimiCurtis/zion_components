@@ -19,6 +19,7 @@
 #include <vector>
 
 // ROS application/library includes
+#include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <tf2_eigen/tf2_eigen.h>
@@ -37,15 +38,28 @@
 
 // Parameters for height of the stairs, given by the regulations:
 const float k_height_min = 0.07f;  // Min height 
-const float k_height_max = 0.3f;    //1.f; 0.2f Max height 
+const float k_height_max = 1.f;    //1.f; 0.2f Max height 
 // const float k_length_min = 0.1f;   // Min length is 20 cm (no max length)
 const float k_area_min = 0.2f; // Min step area
 
 class Stair
-{
-public:
+{   
+    /**
+    * TODO: 
+    * 1.set the public protected private better
+    */
+    public:
 
-    Stair(const std::vector<Plane>& planes)
+        /**
+         * @brief Constructor for the Stair class.
+         *
+         * This constructor initializes a Stair object using a vector of Plane objects.
+         * It sorts the planes by height, calculates stair properties, and determines
+         * whether it represents an upward or downward stair.
+         *
+         * @param planes A vector of Plane objects representing the stair steps.
+         */
+        Stair(const std::vector<Plane>& planes)
         {
 
             for (const Plane& plane : planes){
@@ -56,15 +70,14 @@ public:
                 return plane1.plane_coefficients_->values[3] < plane2.plane_coefficients_->values[3];
             };
 
-            // sorting by height 
-            // min height is first
+            // Sorting by height 
+            // The minimum height is at the beginning of the vector.
             std::sort(Planes_.begin(), Planes_.end(), compareByHeight);
 
             step_height_ = fabs(Planes_.front().plane_coefficients_->values[3] 
                                 - Planes_.back().plane_coefficients_->values[3]);
 
             if(Planes_.back().type_ == 0){
-                std::cout<<" Upward Stair!"<< std::endl;
                 type_ = 0;
                 step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_.front().cloud_,
                                                                         0.055, 30, true);
@@ -72,7 +85,6 @@ public:
                 step_width_ = planes.front().width_;
 
             }else{
-                std::cout<<" Downward Stair!"<< std::endl;
                 type_ = 1;
                 step_distance_ = Utilities::findAvgXForPointsBelowYThreshold(Planes_.front().cloud_,
                                                                         0.055, 30, false);
@@ -85,68 +97,93 @@ public:
                                                                     stair_pose_.position.x));                                             
         }
 
+        /**
+         * TODO: 
+         * 1.Refacor this constructor
+         * @brief Default constructor. Initializes stair parameters to zero.
+         */
+        Stair(){
+                step_distance_ = 0.;
+                step_height_ = 0.;
+                step_width_ = 0.;
+                step_length_ = 0.;
+                step_angle_ = 0.;
+            }
 
-    // /**
-    //  * @brief Constructor that initializes the stair with given planes.
-    //  * @param planes Vector of Plane objects representing the steps.
-    //  */
-    // Stair(const std::vector<Plane>& planes){
-    //         step_distance_ = 0.;
-    //         step_height_ = 0.;
-    //         step_width_ = 0.;
-    //         step_length_ = 0.;
-    //         step_angle_ = 0.;
+        /**
+         * @brief Destructor.
+         */
+        ~Stair(){}
 
-    //         for (int i=0; i< static_cast<int>(planes.size()); i++){
-    //             Planes_.push_back(planes[i]);
-    //         } 
-    //     }
-
-    /**
-     * @brief Default constructor. Initializes stair parameters to zero.
-     */
-    Stair(){
-            step_distance_ = 0.;
-            step_height_ = 0.;
-            step_width_ = 0.;
-            step_length_ = 0.;
-            step_angle_ = 0.;
+        /**
+         * @brief Get a reference to the current Stair object.
+         * @return A reference to the current Stair object.
+         */
+        Stair& get(){
+            return *this;
         }
 
-    /**
-     * @brief Destructor.
-     */
-    ~Stair(){}
+        /**
+         * @brief Get the orientation of the stair in quaternion representation.
+         *
+         * @return The orientation of the stair in quaternion.
+         */
+        geometry_msgs::msg::Quaternion getStairOrientation() const;
 
-    Stair& get(){
-        return *this;
-    }
+        /**
+         * @brief Set the orientation of the stair.
+         *
+         * This function calculates and sets the orientation of the stair based on the planes
+         * associated with the stair.
+         */
+        void setStairOrientation();
 
-    void setStair(const std::vector<Plane>& planes);
+        /**
+         * @brief Get the pose (position and orientation) of the stair.
+         *
+         * @return The pose of the stair.
+         */
+        geometry_msgs::msg::Pose getStairPose() const;
 
-    geometry_msgs::msg::Quaternion getStairOrientation() const;
-    void setStairOrientation();
+        /**
+         * @brief Set the pose (position and orientation) of the stair.
+         *
+         * This function calculates and sets the pose of the stair based on the planes
+         * associated with the stair. The position is determined by the step distance and the
+         * centroid of the first plane in the stair, and the orientation is set by the
+         * setStairOrientation() function.
+         */
+        void setStairPose();
 
-    geometry_msgs::msg::Pose getStairPose() const;
-    void setStairPose();
+        /**
+         * @brief Transform the stair pose to the map frame.
+         *
+         * @param bp2m An Eigen Affine3d transformation representing the base to map transform.
+         */
+        void TransformPoseToMap(Eigen::Affine3d& bp2m);
 
-    void TransformPoseToMap(Eigen::Affine3d&) ;
-    void TransformPoseToBase(Eigen::Affine3d&) ;
+        /**
+         * @brief Transform the stair pose to the base frame.
+         *
+         * @param m2bp An Eigen Affine3d transformation representing the map to base transform.
+         */
+        void TransformPoseToBase(Eigen::Affine3d& m2bp);
 
-    // Members:
-    std::vector<Plane> Planes_; // Step candidates given by the detection process
-    int type_; // 0 = upwards, 1 = downwards
-    float step_width_; // Width of the step
-    float step_length_; // Length of the step
-    float step_height_; // Height of the step
-    float step_distance_; // Distance between steps
-    float step_angle_; // Angle of the stair
+        // Members:
+        std::vector<Plane> Planes_; // Step candidates given by the detection process
+        int type_;                  // 0 = upwards, 1 = downwards
+        float step_width_;          // Width of the step
+        float step_length_;         // Length of the step
+        float step_height_;         // Height of the step
+        float step_distance_;       // Distance between steps
+        float step_angle_;          // Angle of the stair
 
-    geometry_msgs::msg::Pose stair_pose_; ///< Pose of the detected stair.
-    geometry_msgs::msg::Pose stair_pose_in_map_; ///< Pose of the detected stair in map frame.
+        geometry_msgs::msg::Pose stair_pose_; ///< Pose of the detected stair.
+        geometry_msgs::msg::Pose stair_pose_in_map_; ///< Pose of the detected stair in map frame.
 
+    protected:
 
-private:
+    private:
     // Currently no private members or methods are defined
 };
 

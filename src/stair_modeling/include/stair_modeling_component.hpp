@@ -24,6 +24,8 @@ using namespace std::chrono_literals;
 #include <string>
 #include <math.h>
 #include <iostream>
+#include <iomanip> // Include the <iomanip> header for formatting
+
 
 // Third party libraries includes
 #include <vector>
@@ -71,7 +73,6 @@ using namespace std::chrono_literals;
 #include "visibility_control.hpp"
 #include <zion_msgs/msg/stair.hpp>
 #include <zion_msgs/msg/stair_stamped.hpp>
-#include <zion_msgs/msg/stair_det_stamped.hpp>
 #include <zion_msgs/srv/get_stair.hpp>
 
 namespace zion
@@ -96,6 +97,7 @@ namespace zion
         virtual ~StairModeling();
 
     protected:
+
         /**
          * @brief Callback function for processing received point clouds.
          * @param pcl_msg Point cloud message received from a subscribed topic.
@@ -103,55 +105,45 @@ namespace zion
         void pclCallback(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg);
 
         /**
-         * @brief Publishes the convex hulls of detected planes as a MarkerArray.
-         * @param cloud_frame The frame ID of the point cloud.
+         * @brief Publishes visualization markers for the convex hulls of planes.
+         * This function generates and publishes visualization markers for the convex hulls
+         * of a vector of planes. It visualizes the hulls as line segments in the specified
+         * frame, using different colors for differentiation.
+         * @param planes The vector of Plane objects representing the planes to visualize.
+         * @param cloud_frame The frame in which to visualize the markers.
+         * @param now The timestamp for the markers.
          */
-        void publishHullsAsMarkerArray(const std::string& cloud_frame);
-
-
-        /**
-         * @brief Publishes the convex hulls of detected planes as a MarkerArray.
-         * @param cloud_frame The frame ID of the point cloud.
-         */
-
         void publishPlanesHulls(const std::vector<Plane>& planes,
                                 const std::string& cloud_frame,
                                 rclcpp::Time& now);
 
         /**
-         * @brief Publishes the detected stair properties to a ROS topic.
-         * This function takes the properties of the detected stair and constructs a message which 
-         * is then published to a ROS topic for further use or visualization.
-         * @param cloud_frame The frame ID associated with the detected stair.
-         */
-        void publishStairPose(const std::string &cloud_frame);
-
-
-        /**
-         * @brief Publishes the detected stair properties to a ROS topic.
-         * This function takes the properties of the detected stair and constructs a message which 
-         * is then published to a ROS topic for further use or visualization.
-         * @param cloud_frame The frame ID associated with the detected stair.
+         * @brief Publishes the pose of a stair in a specified frame.
+         * This function publishes the pose of a stair as a PoseStamped message in the
+         * specified frame at the given timestamp.
+         * @param pose The pose of the stair to be published.
+         * @param cloud_frame The frame in which to publish the pose.
+         * @param now The timestamp for the published pose.
          */
         void publishStairPose(const geometry_msgs::msg::Pose& pose,
                                 const std::string &cloud_frame,
                                 rclcpp::Time& now);
 
         /**
-         * @brief Publishes the the Stair msgs.
-         * @param cloud_frame The frame ID of the point cloud.
-         */
-        void publishStair(const std::string& cloud_frame);
-
-        /**
-         * @brief Publishes the the Stair msgs.
-         * @param cloud_frame The frame ID of the point cloud.
+         * @brief Publishes the pose of a stair in a specified frame.
+         * This function publishes the pose of a stair as a PoseStamped message in the
+         * specified frame at the given timestamp.
+         * @param pose The pose of the stair to be published.
+         * @param cloud_frame The frame in which to publish the pose.
+         * @param now The timestamp for the published pose.
          */
         void publishStair(const Stair& stair,
                             const std::string& cloud_frame,
                             rclcpp::Time& now);
 
-
+        /**
+        * not in use for now
+        */
         void get_stair_service_callback(
             const std::shared_ptr<zion_msgs::srv::GetStair::Request> request,
             const std::shared_ptr<zion_msgs::srv::GetStair::Response> response);
@@ -163,17 +155,10 @@ namespace zion
          * and sets the corresponding class members.
          */
         void loadParams();
-        
-        /**
-         * @brief Logs the debug message to the ROS info stream.
-         * Appends a line separator to the debug message and logs it. 
-         * This is useful for debugging purposes.
-         */
-        void printDebug();
 
         /**
          * @brief Resets the state of the stair modeling component.
-         * Clears detected planes, resets debug message, and initializes
+         * Clears detected planes and initializes
          * indices and flags related to stair detection.
          */
         void reset();
@@ -203,30 +188,83 @@ namespace zion
          */
         bool checkForValidCandidate(Stair& stair);
 
-
         /**
-         * @brief Checks if there is a valid stair detected.
-         * This function validates if the detected planes correspond to a stair structure 
-         * based on the number of detected planes and the length of the level.
+         * @brief Decrement the counters in the counter buffer.
+         * This function decrements the counters in the counter buffer and logs the changes.
+         * @param counter_buffer The vector of counters to be decremented.
          */
-        void stairDetectionFilter(Stair& stair, bool is_valid_candidate);
-
         void decrementCounter(std::vector<int>& counter_buffer);
 
+        /**
+         * @brief Remove stairs below a specified threshold from buffers.
+         * This function checks the counters in the counter buffer and removes stairs from the
+         * stairs buffer if their counters are below the specified threshold. It updates both
+         * buffers accordingly.
+         * @param stairs_buffer The vector of Stair objects representing stairs.
+         * @param counter_buffer The vector of counters for stairs.
+         */
         void removeBelowThresh(std::vector<Stair>& stairs_buffer,
-                                            std::vector<int>& counter_buffer);
-        
-        void pushToBuffers(std::vector<Stair>& stairs_buffer,
-                                            std::vector<int>& counter_buffer,
-                                            Stair& stair);
+                            std::vector<int>& counter_buffer);
 
+        /**
+         * @brief Push a stair and its counter to the buffers.
+         * This function adds a Stair object to the stairs buffer and initializes its counter
+         * in the counter buffer.
+         * @param stairs_buffer The vector of Stair objects representing stairs.
+         * @param counter_buffer The vector of counters for stairs.
+         * @param stair The Stair object to be added to the buffers.
+         */
+        void pushToBuffers(std::vector<Stair>& stairs_buffer,
+                        std::vector<int>& counter_buffer,
+                        Stair& stair);
+
+        /**
+         * @brief Update the buffers with a new or existing stair.
+         * This function updates the buffers by comparing a new stair with existing stairs in
+         * the buffer. If a match is found, the existing stair is updated; otherwise, the new
+         * stair is added to the buffers.
+         * @param stairs_buffer The vector of Stair objects representing stairs.
+         * @param counter_buffer The vector of counters for stairs.
+         * @param stair The Stair object to be compared and potentially updated.
+         */
         void updateBuffers(std::vector<Stair>& stairs_buffer,
-                                            std::vector<int>& counter_buffer,
-                                            Stair& stair);
-        
+                        std::vector<int>& counter_buffer,
+                        Stair& stair);
+
+        /**
+         * @brief Check if a stair has been detected.
+         * This function checks if a stair has been detected based on the counters in the
+         * counter buffer and returns true if a stair has been detected. It also updates the
+         * detected stair with the relevant information.
+         * @param stairs_buffer The vector of Stair objects representing stairs.
+         * @param counter_buffer The vector of counters for stairs.
+         * @param detect_stair The Stair object to store the detected stair information.
+         * @return True if a stair is detected; otherwise, false.
+         */
         bool isDetectedStair(std::vector<Stair>& stairs_buffer,
-                                            std::vector<int>& counter_buffer,
-                                            Stair& detect_stair);
+                            std::vector<int>& counter_buffer,
+                            Stair& detect_stair);
+
+        /**
+         * @brief Calculate the position error between two stairs.
+         * This function calculates the position error between two Stair objects based on their
+         * map positions and returns the error as a double value.
+         * @param stair1 The first Stair object for comparison.
+         * @param stair2 The second Stair object for comparison.
+         *
+         * @return The position error as a double value.
+         */
+        double calculatePositionError(const Stair& stair1, const Stair& stair2);
+
+        /**
+         * @brief Update a Stair object with weighted averages.
+         * This function updates a Stair object by calculating weighted averages of its
+         * properties with another Stair object. The weight 'w_' is used for averaging.
+         * @param stair1 The first Stair object to be updated.
+         * @param stair2 The second Stair object for averaging.
+         * @return The updated Stair object.
+         */
+        Stair updateStair(Stair& stair1, Stair& stair2);
 
         /**
          * @brief Constructs a Stair object from the detected planes.
@@ -234,25 +272,9 @@ namespace zion
          * It determines the type (ascending/descending), dimensions, and other characteristics of the stair.
          */
         void setStair();
-        
-        /**
-         * @brief Computes the pose of the detected stair.
-         * This function determines the position and orientation of the detected stair 
-         * based on the transition point and the principal directions of the plane representing the stair level.
-         */
-        // void getStairPose();
-        geometry_msgs::msg::Quaternion getStairOrientation();
-
-        geometry_msgs::msg::Quaternion getStairOrientation(const Stair& stair);
-
-        double calculatePositionError(const Stair& stair1, const Stair& stair2);
-
-        Stair updateStair(Stair& stair1, Stair& stair2);
 
         // Not in use. 
         void calcPlaneSlope();
-
-
 
     private:
 
@@ -263,10 +285,11 @@ namespace zion
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr hull_marker_array_pub_; ///< Publisher to the hull topic.
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_; ///< Publisher to the stair pose topic.
         rclcpp::Publisher<zion_msgs::msg::StairStamped>::SharedPtr stair_pub_; ///< Publisher to the stair topic.
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_pub_;
+        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_pub_; ///< Publisher to the filtered pcl topic.
         geometry_msgs::msg::Pose::SharedPtr stair_pose_; ///< Pose of the detected stair.
 
         // Services
+        // not in use for now
         rclcpp::Service<zion_msgs::srv::GetStair>::SharedPtr stair_service_;
 
         // tf2_ros
@@ -279,13 +302,11 @@ namespace zion
         // PointCloud objects and flags
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;   ///< Input point cloud.
         std::shared_ptr<sensor_msgs::msg::PointCloud2> pcl_buffer_;  ///< Buffer for storing the processed point cloud.
-        bool stair_detected_; ///< Flag indicating whether a stair has been detected.
-        int floor_index_; ///< Index of the detected floor plane.
-        int level_index_; ///< Index of the detected level plane.
-
-        Stair detected_stair_filtered_;
+        
+        Stair detected_stair_filtered_; // fitered detected stair which will be publish finally
         std::vector<Stair> stairs_arr_; ///< filter detections of valid candidates
         std::vector<int> stairs_counts_arr_; ///< counts of valid candidates for filtering
+        bool stair_detected_; ///< Flag indicating whether a stair has been detected.
 
         // Transformation matrix.
         Eigen::Affine3d c2bp;
@@ -296,7 +317,7 @@ namespace zion
         // Parameters for voxel filtering
         double leaf_size_xy_;
         double leaf_size_z_;
-    
+
         // Parameters defining the crop box's dimensions
         double min_x_;
         double max_x_;
@@ -332,7 +353,6 @@ namespace zion
         
         bool planes_empty_; ///< No planes are found. True == there is no planes found from segmentation.
         bool debug_; ///< Flag for debugging mode.
-        std::string debug_msg_; ///< Message string for debugging.
     };
 } // namespace
 
